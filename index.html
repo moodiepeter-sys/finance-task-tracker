@@ -215,7 +215,7 @@
         </div>
 
         <div class="flex-group align-items-center">
-            <!-- 新增：已完成 Ad-hoc Tasks 歸檔按鈕 -->
+            <!-- 已完成 Ad-hoc Tasks 歸檔按鈕 -->
             <button class="btn-settings btn-archive" onclick="openArchiveModal()">📦 已完成既 ad-hoc tasks</button>
             <div class="flex-center-gap">
                 <button class="btn-settings" onclick="openStaffSettings()">⚙️ 員工管理</button>
@@ -317,9 +317,7 @@
         </div>
     </div>
 
-    <!-- ==========================================
-         🔍 Modals (對話框) 區域
-         ========================================== -->
+    <!-- Modals (對話框) 區域 -->
     <div class="modal-overlay" id="calendarModal" style="padding: 20px; box-sizing: border-box;">
         <div class="modal-content modal-calendar-content">
             <div class="modal-calendar-header">
@@ -414,7 +412,7 @@
         </div>
     </div>
 
-    <!-- 新增：歸檔庫 Archive Modal -->
+    <!-- 歸檔庫 Archive Modal -->
     <div class="modal-overlay" id="archiveModal">
         <div class="modal-content" style="width: 500px; max-width: 95%; max-height: 80vh; display: flex; flex-direction: column;">
             <h3 style="margin-top:0; color:var(--adhoc);">📦 已完成既 ad-hoc tasks</h3>
@@ -425,7 +423,7 @@
         </div>
     </div>
 
-    <!-- 新增：歷史紀錄 History Modal -->
+    <!-- 歷史紀錄 History Modal -->
     <div class="modal-overlay modal-topmost" id="historyModal">
         <div class="modal-content" style="width: 400px; max-width: 95%; text-align: left;">
             <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;">📜 任務歷史 <span style="font-size: 12px; font-weight:normal; color:#5e6c84;">(Audit Trail)</span></h3>
@@ -512,6 +510,7 @@
         let staffList = [];
         let categoryList = [];
         let calendarApp = null;
+        let isSyncing = false; // 防重複發送請求狀態鎖
         
         // 狀態名稱對照表 (供 History 使用)
         const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review (我睇)', 'review-boss': 'Final Review (我腦細睇)', 'done': 'Done', 'archived': '已歸檔' };
@@ -545,7 +544,9 @@
         // 🛠️ 輔助工具函數 (Utility Functions)
         // ==========================================
         function getLocalDateString(dateObj = new Date()) {
-            return new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            if (!dateObj || isNaN(new Date(dateObj).getTime())) return '';
+            const d = new Date(dateObj);
+            return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
         }
         
         function getCurrentDateTime() {
@@ -610,13 +611,20 @@
             statusEl.style.background = "#e3fcef";
             statusEl.style.color = "#006644";
             
-            const localTasks = getSafeLocalItem('financeTasks');
-            const localStaff = getSafeLocalItem('financeStaff');
-            const localCategories = getSafeLocalItem('financeCategories');
-            
-            tasks = localTasks ? JSON.parse(localTasks) : [];
-            staffList = localStaff ? JSON.parse(localStaff) : [];
-            categoryList = localCategories ? JSON.parse(localCategories) : ['Drug', 'OC', 'Donation', 'Trust', 'Admin'];
+            try {
+                const localTasks = getSafeLocalItem('financeTasks');
+                const localStaff = getSafeLocalItem('financeStaff');
+                const localCategories = getSafeLocalItem('financeCategories');
+                
+                tasks = localTasks ? JSON.parse(localTasks) : [];
+                staffList = localStaff ? JSON.parse(localStaff) : [];
+                categoryList = localCategories ? JSON.parse(localCategories) : ['Drug', 'OC', 'Donation', 'Trust', 'Admin'];
+            } catch (e) {
+                console.warn("本機數據格式異常，恢復預設值", e);
+                tasks = [];
+                staffList = [];
+                categoryList = ['Drug', 'OC', 'Donation', 'Trust', 'Admin'];
+            }
             
             renderStaffOptions(); renderCategoryOptions(); renderTasks(); initSortable();
         }
@@ -646,7 +654,7 @@
                     }
                     let fetchedTasks = data.tasks || [];
                     tasks = fetchedTasks.map(t => {
-                        // 修正時區 Bug：將 UTC 轉換回 Local Time
+                        // 修正時區 Bug：將 ISO / UTC 時間轉換回本地 YYYY-MM-DD
                         if (t.deadline && t.deadline !== 'ASAP' && typeof t.deadline === 'string' && t.deadline.includes('T')) {
                             t.deadline = getLocalDateString(new Date(t.deadline));
                         }
@@ -683,6 +691,9 @@
                 return;
             }
 
+            if (isSyncing) return; // 防重複觸發同步
+            isSyncing = true;
+
             statusEl.innerText = "☁️ 同步中...";
             const fetchUrl = `${DEFAULT_CLOUD_URL}?sheetId=${encodeURIComponent(userSheetId)}`;
 
@@ -707,6 +718,9 @@
                 statusEl.innerText = "⚠️ 同步失敗"; 
                 statusEl.style.background = "#ffebe6";
                 statusEl.style.color = "#de350b";
+            })
+            .finally(() => {
+                isSyncing = false; // 釋放鎖
             });
         }
 
@@ -850,7 +864,7 @@
                 if (t.status === 'archived') return false; // 隱藏已歸檔
                 if (selectedStaff !== "ALL" && t.assignee !== selectedStaff) return false;
                 if (selectedCategory !== "ALL" && t.category !== selectedCategory) return false;
-                if (t.deadline === 'ASAP') return false;
+                if (!t.deadline || t.deadline === 'ASAP' || isNaN(Date.parse(t.deadline))) return false; // 安全過濾空值與無效日期
                 return true;
             }).map(t => {
                 let color = t.type === 'Routine' ? 'var(--routine)' : 'var(--adhoc)';
@@ -953,7 +967,10 @@
                 if (a.deadline === 'ASAP' && b.deadline !== 'ASAP') return -1;
                 if (a.deadline !== 'ASAP' && b.deadline === 'ASAP') return 1;
                 if (a.deadline === 'ASAP' && b.deadline === 'ASAP') return 0;
-                return new Date(a.deadline) - new Date(b.deadline);
+                
+                const timeA = Date.parse(a.deadline) || 0;
+                const timeB = Date.parse(b.deadline) || 0;
+                return timeA - timeB;
             });
 
             tasks.forEach(task => {
@@ -975,7 +992,7 @@
                 
                 let deadlineClass = '';
                 let overdueWarning = '';
-                let displayDate = task.deadline;
+                let displayDate = task.deadline || '未定';
                 let isUrgent = false;
                 let isOverdue = false; 
                 let isFuture = false; 
@@ -985,7 +1002,7 @@
                         deadlineClass = 'text-urgent';
                         overdueWarning = '⚡ ';
                         isUrgent = true;
-                    } else {
+                    } else if (task.deadline && !isNaN(Date.parse(task.deadline))) {
                         const taskDate = new Date(task.deadline);
                         taskDate.setHours(0,0,0,0);
                         const diffDays = Math.ceil((taskDate.getTime() - todayMs) / (1000 * 60 * 60 * 24));
@@ -1071,7 +1088,6 @@
                                 <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
                             </select>
                             <div style="display: flex; gap: 5px;">
-                                <!-- 新增：歷史按鈕 -->
                                 <button class="btn-history" onclick="openHistoryModal('${task.id}')">📜 歷史</button>
                                 <button class="btn-edit" onclick="openEditModal('${task.id}')">修改</button>
                                 <button class="btn-delete" onclick="openDeleteModal('${task.id}')">刪除</button>
@@ -1146,7 +1162,6 @@
                 remark: document.getElementById('taskRemark').value,
                 subtasks: parsedSubtasks,
                 status: 'todo',
-                // 新增：寫入建立歷史
                 history: [{ time: getCurrentDateTime(), log: `➕ 建立任務` }]
             });
             
@@ -1217,7 +1232,7 @@
                 
                 if (task.type === 'Routine' && task.status === 'done') {
                     task.status = 'todo';
-                    if (task.deadline && task.deadline !== 'ASAP') {
+                    if (task.deadline && task.deadline !== 'ASAP' && !isNaN(Date.parse(task.deadline))) {
                         const date = new Date(task.deadline);
                         const freq = parseInt(task.frequency) || 1;
                         date.setMonth(date.getMonth() + freq);
@@ -1228,7 +1243,6 @@
                     task.history.push({ time: getCurrentDateTime(), log: `🔁 結算 Routine: 狀態重置為 To Do，延期至 ${task.deadline}` });
                     resetCount++;
                 } else if (task.type === 'Ad-hoc' && task.status === 'done') {
-                    // 將刪除改為歸檔 (Archived)
                     task.status = 'archived';
                     task.history.push({ time: getCurrentDateTime(), log: `📦 結算 Ad-hoc: 移入歸檔庫` });
                     archiveCount++;
@@ -1344,7 +1358,7 @@
         
         function renderArchiveList() {
             const container = document.getElementById('archiveListContainer');
-            const archivedTasks = tasks.filter(t => t.status === 'archived').sort((a,b) => new Date(b.deadline) - new Date(a.deadline));
+            const archivedTasks = tasks.filter(t => t.status === 'archived').sort((a,b) => (Date.parse(b.deadline) || 0) - (Date.parse(a.deadline) || 0));
             
             if (archivedTasks.length === 0) {
                 container.innerHTML = '<p style="text-align:center; color:#5e6c84; padding: 30px;">暫無已歸檔任務 🎉</p>';
@@ -1379,7 +1393,7 @@
                 task.history.push({ time: getCurrentDateTime(), log: `↩️ 由歸檔庫還原至 Done 狀態` });
                 saveTasks(true); 
                 renderTasks(); 
-                renderArchiveList(); // 即時更新歸檔庫畫面
+                renderArchiveList();
                 showToast("✅ 任務已還原至看板");
             }
         };
