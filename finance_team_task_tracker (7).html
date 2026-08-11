@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Team Task Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    
+    <style>
+        /* ==========================================
+           🎨 1. 全局變數與基礎設定 (Global Variables)
+           ========================================== */
+        :root {
+            --bg-color: #f4f5f7;
+            --primary: #0052cc;
+            --routine: #00875a;
+            --adhoc: #de350b;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* ==========================================
+           🏗️ 2. 佈局結構 (Layout & Containers)
+           ========================================== */
+        .header-container { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 30px; position: relative; }
+        h1 { color: #172b4d; margin: 0; }
+        
+        .top-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .flex-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .flex-center-gap { display: flex; align-items: center; gap: 8px; }
+        
+        .form-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+        .form-input-grow { flex-grow: 1; }
+
+        /* ==========================================
+           🎛️ 3. UI 元件 (Buttons, Inputs, Badges, Toasts)
+           ========================================== */
+        input, select, button, textarea { padding: 10px; border: 1px solid #dfe1e6; border-radius: 4px; font-size: 14px; font-family: inherit; }
+        button { background-color: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background-color: #0047b3; }
+        
+        .filter-container { background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 10px; border-left: 4px solid var(--primary); }
+        .filter-container select { padding: 6px; border-radius: 4px; border: 1px solid #dfe1e6; font-weight: bold; color: var(--primary); }
+        
+        #cloudStatus { background: #e3fcef; color: #006644; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #00a670; display: inline-block; }
+        
+        .btn-settings { background-color: #5e6c84; color: white; padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-settings:hover { background-color: #42526e; }
+        .btn-category { background-color: #6554c0; }
+        .btn-db { background-color: #0052cc; }
+        .btn-calendar-view { background-color: #6554c0; padding: 8px 15px; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
+        .btn-reset-routine { background-color: var(--routine); min-width: 150px; white-space: nowrap; }
+        
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; color: white; font-weight: bold; white-space: nowrap; }
+        .badge.routine { background-color: var(--routine); }
+        .badge.adhoc { background-color: var(--adhoc); }
+        .badge.category { background-color: #6554c0; margin-bottom: 5px; display: inline-block; }
+        .badge.freq { background: #e3fcef; color: #006644; border: 1px solid #00a670; }
+        
+        .select-routine { background-color: #e3fcef; border-color: #00875a; color: #006644; }
+
+        .textarea-subtasks { width: 100%; margin-top: 10px; resize: vertical; min-height: 60px; font-size: 13px; box-sizing: border-box; }
+        .subtasks-container { margin-top: 10px; border-top: 1px dashed #dfe1e6; padding-top: 8px; }
+        .subtasks-header { font-size: 12px; font-weight: bold; color: #5e6c84; margin-bottom: 5px; }
+
+        #toast { visibility: hidden; min-width: 250px; background-color: #172b4d; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 10000; left: 50%; transform: translateX(-50%); bottom: 30px; font-size: 14px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s, bottom 0.3s; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+
+        .asap-checkbox { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: var(--adhoc); cursor: pointer; padding: 8px 12px; background: #ffebe6; border-radius: 4px; border: 1px solid #ffbdad; white-space: nowrap; flex-shrink: 0; }
+        .asap-checkbox input { margin: 0; width: 16px; height: 16px; cursor: pointer; }
+
+        /* ==========================================
+           📋 4. 看板與卡片樣式 (Kanban & Cards)
+           ========================================== */
+        .board { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 10px; min-height: 250px; margin-bottom: 40px; }
+        .column { background: #ebecf0; border-radius: 8px; width: 25%; min-width: 210px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .column h2 { font-size: 16px; color: #172b4d; margin: 10px; padding-bottom: 10px; border-bottom: 2px solid #dfe1e6; }
+        .list-group { flex-grow: 1; min-height: 50px; display: flex; flex-direction: column; gap: 10px; }
+        
+        .board-title { margin: 0; padding-bottom: 5px; width: 100%; }
+        .board-title.routine { color: var(--routine); border-bottom: 3px solid var(--routine); }
+        .board-title.adhoc { color: var(--adhoc); border-bottom: 3px solid var(--adhoc); margin-bottom: 15px; }
+
+        .card { background: white; border-radius: 6px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); border-left: 4px solid gray; cursor: pointer; transition: all 0.2s ease; }
+        .card:hover { box-shadow: 0 2px 5px rgba(0,0,0,0.25); }
+        .card.routine { border-left-color: var(--routine); }
+        .card.adhoc { border-left-color: var(--adhoc); }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 8px; }
+        .task-title { font-weight: bold; color: #172b4d; font-size: 15px; line-height: 1.4; display: flex; align-items: center; gap: 5px;}
+        .task-title::after { content: '🔽'; font-size: 10px; color: #8993a4; opacity: 0.5; }
+        .card.expanded .task-title::after { content: '🔼'; }
+
+        .card-details-wrapper { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #dfe1e6; }
+        .card.expanded .card-details-wrapper { display: block; }
+        .card-details { font-size: 13px; color: #5e6c84; margin-bottom: 12px; line-height: 1.6; background: #f4f5f7; padding: 8px; border-radius: 4px; }
+        .card-actions { display: flex; justify-content: space-between; align-items: center; }
+        .card-actions select { padding: 6px; font-size: 13px; border-color: #c1c7d0; background-color: #fafbfc; }
+        
+        .task-remark-text { margin-top: 6px; color: #8993a4; font-size: 12px; font-style: italic; }
+        
+        .btn-delete { background-color: transparent; color: var(--adhoc); border: 1px solid var(--adhoc); padding: 6px 10px; font-size: 12px; }
+        .btn-delete:hover { background-color: #ffebe6; color: var(--adhoc); }
+        .btn-edit { background-color: transparent; color: var(--primary); border: 1px solid var(--primary); padding: 6px 10px; font-size: 12px; margin-right: 5px; }
+        .btn-edit:hover { background-color: #e6efff; color: var(--primary); }
+
+        .future-task { opacity: 0.55; background-color: #fafbfc; border-left-color: #a5adba !important; transform: scale(0.98); }
+        .future-task:hover { opacity: 0.9; transform: scale(1); }
+        .future-divider { font-size: 12px; color: #5e6c84; text-align: center; margin: 15px 0 5px 0; display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        .future-divider::before, .future-divider::after { content: ""; flex: 1; border-bottom: 1px dashed #c1c7d0; }
+        .sortable-ghost { opacity: 0.4; background-color: #dfe1e6; }
+        
+        .urgent-panel { background-color: #fff0b3; border-left: 4px solid #ff991f; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .urgent-panel h3 { margin: 0 0 10px 0; color: #172b4d; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .urgent-list { margin: 0; padding-left: 20px; font-size: 14px; color: #172b4d; line-height: 1.6; }
+        .text-urgent { color: #de350b; font-weight: bold; font-size: 14px; }
+        .text-warning { color: #ff991f; font-weight: bold; }
+        .urgent-review-am { color: #0052cc; font-weight: bold; }
+        .urgent-overdue-badge { color: #de350b; background: #ffebe6; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-left: 5px; font-weight: bold; }
+
+        /* ==========================================
+           📅 5. 日曆與 Modal (Calendar & Modals)
+           ========================================== */
+        .fc { font-family: 'Segoe UI', sans-serif; height: 100%; }
+        .fc-event-title { font-weight: bold; font-size: 12px; }
+        .fc-daygrid-day { cursor: pointer; transition: background-color 0.2s; }
+        .fc-daygrid-day:hover { background-color: #f4f5f7 !important; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(9, 30, 66, 0.54); display: none; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-content { background: white; padding: 24px; border-radius: 8px; width: 350px; max-width: 90%; text-align: center; }
+        
+        .modal-calendar-content { width: 95%; height: 90%; max-width: 1200px; padding: 20px; display: flex; flex-direction: column; text-align: left; box-sizing: border-box; }
+        .modal-calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-calendar-title { margin: 0; color: #172b4d; }
+        .modal-calendar-body { flex-grow: 1; display: block; box-shadow: none; padding: 0; margin: 0; background: transparent; overflow: hidden; height: auto; }
+        
+        .modal-day-tasks-content { width: 400px; text-align: left; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-day-tasks-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #dfe1e6; padding-bottom: 10px; }
+        .modal-day-tasks-title { margin: 0; color: #172b4d; font-size: 16px; }
+        .modal-day-tasks-body { overflow-y: auto; flex-grow: 1; padding-right: 5px; }
+        
+        .modal-actions { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+        .btn-cancel { background-color: #f4f5f7; color: #172b4d; border: none; }
+        .btn-cancel:hover { background-color: #ebecf0; }
+        .btn-confirm { background-color: var(--adhoc); border: none; }
+        .btn-confirm:hover { background-color: #bf2600; }
+        
+        .day-tasks-list { display: flex; flex-direction: column; gap: 10px; }
+        .day-task-card { background: #f4f5f7; padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .day-task-details { flex-grow: 1; }
+        .day-task-title { font-weight: bold; color: #172b4d; font-size: 14px; margin-bottom: 6px; }
+        .day-task-title.done { text-decoration: line-through; opacity: 0.7; }
+        .day-task-meta { font-size: 12px; color: #5e6c84; }
+
+        /* ==========================================
+           ⚙️ 6. 設定與管理 (Settings & Lists)
+           ========================================== */
+        .staff-list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #dfe1e6; }
+        .staff-list-item button { background: transparent; color: var(--adhoc); border: 1px solid var(--adhoc); padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .staff-list-item button:hover { background: #ffebe6; }
+        .settings-list-container { max-height: 200px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #dfe1e6; border-radius: 4px; padding: 5px; }
+        .db-settings-section { margin-bottom: 20px; padding: 15px; border-radius: 6px; }
+        .db-settings-local { background: #f4f5f7; }
+        .db-settings-export { background: #e6efff; border: 1px solid #b3d4ff; }
+        .db-settings-title { display: block; margin-bottom: 8px; color: #172b4d; }
+        .db-settings-title.export { color: #0052cc; }
+
+        @media (max-width: 768px) {
+            .board { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-padding: 0 10px; padding-bottom: 20px; }
+            .column { min-width: 85vw; flex: 0 0 85vw; scroll-snap-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-container">
+        <h1>📊 Finance Team Task Tracker</h1>
+        <div id="cloudStatus">⚪ 初始化中...</div>
+    </div>
+
+    <div id="toast">✅ 操作成功</div>
+
+    <div class="top-controls">
+        <div class="flex-group">
+            <div class="filter-container">
+                <span>🔍 同事:</span>
+                <select id="staffFilter" onchange="renderTasks()">
+                    <option value="ALL">🌟 全部 (All Team)</option>
+                </select>
+            </div>
+            <div class="filter-container">
+                <span>📂 分類:</span>
+                <select id="categoryFilter" onchange="renderTasks()">
+                    <option value="ALL">🌟 全部分類</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex-group align-items-center">
+            <div class="flex-center-gap">
+                <button class="btn-settings" onclick="openStaffSettings()">⚙️ 員工管理</button>
+                <button class="btn-settings btn-category" onclick="openCategorySettings()">🏷️ 分類管理</button>
+            </div>
+            <button class="btn-settings btn-db" onclick="openDbSettings()">💾 資料庫設定</button>
+            <button id="viewToggleBtn" class="btn-calendar-view" onclick="openCalendarModal()">📅 開啟日曆</button>
+        </div>
+    </div>
+
+    <div id="urgentPanel" class="urgent-panel" style="display: none;">
+        <h3>🚨 急件提醒 (ASAP / 7日內到期 / 過期)</h3>
+        <ul class="urgent-list" id="urgentList"></ul>
+    </div>
+
+    <form class="form-container" id="taskForm">
+        <div style="width: 100%; display: flex; gap: 15px; flex-wrap: wrap;">
+            <input type="text" id="taskName" class="form-input-grow" placeholder="輸入 Task 名稱 (如: Bank Rec)" required>
+            <input type="text" id="taskRemark" class="form-input-grow" placeholder="備註 (Optional)">
+        </div>
+        
+        <!-- 新增：子任務清單輸入框 -->
+        <textarea id="taskSubtasks" class="textarea-subtasks" placeholder="子任務清單 (每行一個，例如：&#10;1. 對 Bank Statement&#10;2. 入 Journal)"></textarea>
+        
+        <div style="width: 100%; display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; align-items: center;">
+            <select id="taskCategory"></select>
+
+            <select id="taskType">
+                <option value="Routine">🔄 Routine (常規)</option>
+                <option value="Ad-hoc" selected>🔥 Ad-hoc (突發)</option>
+            </select>
+            
+            <select id="taskFrequency" class="select-routine" style="display: none;">
+                <option value="1">每 1 個月</option>
+                <option value="2">每 2 個月</option>
+                <option value="3">每季 (Quarterly)</option>
+                <option value="6">半年 (Half-yearly)</option>
+                <option value="12">每年 (Annually)</option>
+            </select>
+            
+            <select id="taskAssignee"></select>
+
+            <div class="flex-center-gap">
+                <input type="date" id="taskDeadline" required>
+                <label class="asap-checkbox">
+                    <input type="checkbox" id="taskIsASAP" onchange="toggleDeadline(this, 'taskDeadline')"> ASAP⚡
+                </label>
+            </div>
+            
+            <button type="submit">➕ 新增 Task</button>
+        </div>
+    </form>
+
+    <div id="kanbanViewContainer">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
+            <h2 class="board-title routine">🔄 Routine Tasks</h2>
+            <button onclick="openResetModal()" class="btn-reset-routine">🔁 結算已完成 (Done)</button>
+        </div>
+
+        <div class="board">
+            <div class="column">
+                <h2>📝 To Do</h2>
+                <div id="routine-todo-list" class="list-group" data-status="todo" data-type="Routine"></div>
+                <div id="routine-future-divider" class="future-divider" style="display:none;">🔭 遠期任務 (>30日)</div>
+                <div id="routine-future-list" class="list-group" data-status="todo" data-type="Routine" style="min-height: 20px;"></div>
+            </div>
+            <div class="column">
+                <h2>🧐 1st Review</h2>
+                <div id="routine-review-am-list" class="list-group" data-status="review-am" data-type="Routine"></div>
+            </div>
+            <div class="column">
+                <h2>👔 Final Review</h2>
+                <div id="routine-review-boss-list" class="list-group" data-status="review-boss" data-type="Routine"></div>
+            </div>
+            <div class="column">
+                <h2>✅ Done</h2>
+                <div id="routine-done-list" class="list-group" data-status="done" data-type="Routine"></div>
+            </div>
+        </div>
+
+        <h2 class="board-title adhoc">🔥 Ad-hoc Tasks</h2>
+        
+        <div class="board">
+            <div class="column">
+                <h2>📝 To Do</h2>
+                <div id="adhoc-todo-list" class="list-group" data-status="todo" data-type="Ad-hoc"></div>
+            </div>
+            <div class="column">
+                <h2>🧐 1st Review</h2>
+                <div id="adhoc-review-am-list" class="list-group" data-status="review-am" data-type="Ad-hoc"></div>
+            </div>
+            <div class="column">
+                <h2>👔 Final Review</h2>
+                <div id="adhoc-review-boss-list" class="list-group" data-status="review-boss" data-type="Ad-hoc"></div>
+            </div>
+            <div class="column">
+                <h2>✅ Done</h2>
+                <div id="adhoc-done-list" class="list-group" data-status="done" data-type="Ad-hoc"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="calendarModal" style="padding: 20px; box-sizing: border-box;">
+        <div class="modal-content modal-calendar-content">
+            <div class="modal-calendar-header">
+                <h3 class="modal-calendar-title">📅 日曆檢視 (Calendar View)</h3>
+                <button class="btn-cancel" onclick="closeCalendarModal()" style="padding: 6px 15px; font-weight: bold; border-radius: 4px;">✖ 關閉</button>
+            </div>
+            <div id="calendarContainer" class="modal-calendar-body">
+                <div id="calendar" style="height: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dayTasksModal" style="z-index: 10000;">
+        <div class="modal-content modal-day-tasks-content">
+            <div class="modal-day-tasks-header">
+                <h3 id="dayTasksTitle" class="modal-day-tasks-title">📅 任務清單</h3>
+                <button onclick="closeDayTasksModal()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #5e6c84;">✖</button>
+            </div>
+            <div id="dayTasksContainer" class="modal-day-tasks-body"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:#172b4d;">確定要刪除？</h3>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn-confirm" id="confirmDeleteBtn">確認刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="resetModal">
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="margin-top:0; color:var(--routine); text-align: center;">結算已完成嘅 Routine？</h3>
+            <p style="font-size:13px; color:#5e6c84; line-height:1.5;">
+                系統只會將 <strong>「✅ Done」</strong> 內嘅 Routine 任務重新推入 To Do，並根據頻率自動延長 Deadline。<br><br>
+                超過30日先到期嘅任務會自動變成半透明沉底。
+            </p>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeResetModal()">取消</button>
+                <button class="btn-confirm" style="background-color:var(--routine);" id="confirmResetBtn">確認結算</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editModal" style="z-index: 10000;">
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="margin-top:0; color:#172b4d; text-align: center;">✏️ 編輯任務</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <label>任務名稱</label><input type="text" id="editTaskName">
+                
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;"><label>分類</label><select id="editTaskCategory" style="width: 100%;"></select></div>
+                    <div style="flex: 1;">
+                        <label>任務類型</label>
+                        <select id="editTaskType" style="width: 100%;">
+                            <option value="Routine">🔄 Routine</option>
+                            <option value="Ad-hoc">🔥 Ad-hoc</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label id="editFrequencyLabel" style="display:none; color: var(--routine);">循環頻率</label>
+                        <select id="editTaskFrequency" class="select-routine" style="display:none; width: 100%;">
+                            <option value="1">每 1 個月</option>
+                            <option value="2">每 2 個月</option>
+                            <option value="3">每季 (Quarterly)</option>
+                            <option value="6">半年 (Half-yearly)</option>
+                            <option value="12">每年 (Annually)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label>負責人</label><select id="editTaskAssignee"></select>
+                <label>備註 (Remark)</label><input type="text" id="editTaskRemark">
+                
+                <!-- 新增：編輯子任務清單 -->
+                <label style="margin-top: 5px;">子任務清單 (每行一個)</label>
+                <textarea id="editTaskSubtasks" class="textarea-subtasks" style="margin-top: 0; margin-bottom: 5px;"></textarea>
+                
+                <label>截止日期</label>
+                <div class="flex-center-gap">
+                    <input type="date" id="editTaskDeadline" style="flex-grow:1;">
+                    <label class="asap-checkbox">
+                        <input type="checkbox" id="editTaskIsASAP" onchange="toggleDeadline(this, 'editTaskDeadline')"> ASAP⚡
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeEditModal()">取消</button>
+                <button class="btn-confirm" id="confirmEditBtn" style="background-color: var(--primary);">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="staffSettingsModal">
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="margin-top:0; color:#172b4d; text-align: center;">⚙️ 員工名單管理</h3>
+            <div class="flex-center-gap" style="margin-bottom: 15px;">
+                <input type="text" id="newStaffName" class="form-input-grow" placeholder="輸入同事名">
+                <button onclick="addNewStaff()">加入</button>
+            </div>
+            <div id="staffListContainer" class="settings-list-container"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" style="width: 100%; background-color: var(--primary); color: white;" onclick="closeStaffSettings()">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="categorySettingsModal">
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="margin-top:0; color:#172b4d; text-align: center;">🏷️ 分類管理</h3>
+            <div class="flex-center-gap" style="margin-bottom: 15px;">
+                <input type="text" id="newCategoryName" class="form-input-grow" placeholder="輸入新分類">
+                <button style="background-color: #6554c0;" onclick="addNewCategory()">加入</button>
+            </div>
+            <div id="categoryListContainer" class="settings-list-container"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" style="width: 100%; background-color: #6554c0; color: white;" onclick="closeCategorySettings()">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dbSettingsModal">
+        <div class="modal-content" style="text-align: left;">
+            <h3 style="margin-top:0; color:#172b4d; text-align: center;">💾 資料庫設定</h3>
+            
+            <div class="db-settings-section db-settings-local">
+                <strong class="db-settings-title">1. 選擇儲存模式：</strong>
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px; cursor: pointer;">
+                    <input type="radio" name="storageType" id="radioLocal" value="local" onchange="toggleStorageInput()">
+                    <span>💻 本機 (僅限當前瀏覽器)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="storageType" id="radioCloud" value="cloud" onchange="toggleStorageInput()">
+                    <span>☁️ Google Apps Script (雲端)</span>
+                </label>
+                <div id="cloudUrlInputContainer" style="display: none; margin-top: 10px;">
+                    <input type="text" id="apiUrlInput" placeholder="貼上 https://script.google.com/..." style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 8px;">
+                </div>
+            </div>
+
+            <div class="db-settings-section db-settings-export">
+                <strong class="db-settings-title export">2. 本機備份 / 匯出：</strong>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button style="flex:1; background-color: #00875a; font-size:12px;" onclick="exportToCSV()">📊 匯出 CSV</button>
+                    <button style="flex:1; background-color: #6554c0; font-size:12px;" onclick="exportToJSON()">📦 匯出 JSON</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; border-top: 1px dashed #b3d4ff; padding-top: 10px;">
+                    <input type="file" id="importJsonFile" accept=".json" style="flex: 1; font-size: 12px;">
+                    <button style="background-color: #de350b; padding: 8px 12px; font-size:12px;" onclick="importFromJSON()">📥 匯入</button>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeDbSettings()">取消</button>
+                <button class="btn-confirm" style="background-color: var(--primary);" onclick="saveStorageSettings()">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🔧 全局設定與初始化 (Initialization)
+        // ==========================================
+        const DEFAULT_CLOUD_URL = "https://script.google.com/macros/s/AKfycbz1q2Gi8YDzbnETQbZSXcdRUxyEJvND9RqAOO7uYcx3olLSfpIUX_z1dRPKf1qBy7X0Cg/exec"; 
+
+        let API_URL = ""; 
+        let tasks = [];
+        let staffList = [];
+        let categoryList = [];
+        let calendarApp = null;
+
+        window.onload = function() {
+            try {
+                const savedUrl = localStorage.getItem('financeTrackerApiUrl');
+                if (savedUrl) {
+                    API_URL = savedUrl;
+                } else if (DEFAULT_CLOUD_URL && DEFAULT_CLOUD_URL.startsWith("https://script.google.com/")) {
+                    API_URL = DEFAULT_CLOUD_URL;
+                    localStorage.setItem('financeTrackerApiUrl', API_URL); 
+                }
+            } catch (e) {
+                console.warn("LocalStorage 存取受限，將強制使用本機模式");
+                API_URL = "";
+            }
+
+            document.getElementById('taskDeadline').value = getLocalDateString();
+            
+            document.getElementById('taskType').addEventListener('change', function() {
+                document.getElementById('taskFrequency').style.display = this.value === 'Routine' ? 'block' : 'none';
+            });
+            document.getElementById('editTaskType').addEventListener('change', function() {
+                const isRoutine = this.value === 'Routine';
+                document.getElementById('editTaskFrequency').style.display = isRoutine ? 'block' : 'none';
+                document.getElementById('editFrequencyLabel').style.display = isRoutine ? 'block' : 'none';
+            });
+
+            if (API_URL && API_URL.startsWith("https://script.google.com/")) {
+                loadDataFromCloud();
+            } else {
+                loadDataFromLocal();
+            }
+        };
+
+        // ==========================================
+        // 🛠️ 輔助工具函數 (Utility Functions)
+        // ==========================================
+        function getLocalDateString(dateObj = new Date()) {
+            return new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.innerText = message;
+            toast.className = "show";
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        function getSafeLocalItem(key) {
+            try { return localStorage.getItem(key); } catch(e) { return null; }
+        }
+        function setSafeLocalItem(key, value) {
+            try { localStorage.setItem(key, value); } catch(e) { console.warn("無法寫入 LocalStorage"); }
+        }
+
+        function escapeHTML(str) {
+            if(!str) return '';
+            return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
+        }
+
+        window.toggleCard = function(cardElement) {
+            cardElement.classList.toggle('expanded');
+        };
+
+        window.toggleDeadline = function(checkbox, inputId) {
+            const input = document.getElementById(inputId);
+            if (checkbox.checked) {
+                input.value = '';
+                input.disabled = true;
+                input.required = false;
+                input.style.backgroundColor = '#ebecf0';
+            } else {
+                input.disabled = false;
+                input.required = true;
+                input.style.backgroundColor = 'white';
+                input.value = getLocalDateString();
+            }
+        };
+
+        // ==========================================
+        // ☁️ 資料庫與雲端通訊 (Storage & API)
+        // ==========================================
+        function loadDataFromLocal() {
+            const statusEl = document.getElementById('cloudStatus');
+            statusEl.innerText = "💻 本機模式";
+            statusEl.style.background = "#e3fcef";
+            statusEl.style.color = "#006644";
+            
+            const localTasks = getSafeLocalItem('financeTasks');
+            const localStaff = getSafeLocalItem('financeStaff');
+            const localCategories = getSafeLocalItem('financeCategories');
+            
+            tasks = localTasks ? JSON.parse(localTasks) : [];
+            staffList = localStaff ? JSON.parse(localStaff) : [];
+            categoryList = localCategories ? JSON.parse(localCategories) : ['Drug', 'OC', 'Donation', 'Trust', 'Admin'];
+            
+            renderStaffOptions(); renderCategoryOptions(); renderTasks(); initSortable();
+        }
+
+        function loadDataFromCloud() {
+            const statusEl = document.getElementById('cloudStatus');
+            statusEl.innerText = "☁️ 讀取雲端...";
+            statusEl.style.background = "#e6efff";
+            statusEl.style.color = "#0052cc";
+
+            fetch(API_URL)
+                .then(response => response.json())
+                .then(data => {
+                    let fetchedTasks = data.tasks || [];
+                    tasks = fetchedTasks.map(t => {
+                        if (t.deadline && t.deadline !== 'ASAP' && typeof t.deadline === 'string' && t.deadline.includes('T')) {
+                            t.deadline = t.deadline.split('T')[0];
+                        }
+                        return t;
+                    });
+                    staffList = data.staff || [];
+                    categoryList = data.categories || ['Drug', 'OC', 'Donation', 'Trust', 'Admin'];
+                    
+                    renderStaffOptions(); renderCategoryOptions(); renderTasks(); initSortable();
+                    
+                    statusEl.innerText = "☁️ 雲端同步中";
+                })
+                .catch(error => {
+                    API_URL = ""; 
+                    loadDataFromLocal(); 
+                    statusEl.innerText = "⚠️ 連線失敗 (本機模式)";
+                    statusEl.style.background = "#ffebe6";
+                    statusEl.style.color = "#de350b";
+                });
+        }
+
+        function saveTasks(silent = false) {
+            setSafeLocalItem('financeTasks', JSON.stringify(tasks));
+            setSafeLocalItem('financeStaff', JSON.stringify(staffList));
+            setSafeLocalItem('financeCategories', JSON.stringify(categoryList));
+            
+            const statusEl = document.getElementById('cloudStatus');
+            
+            if (!API_URL || !API_URL.startsWith("https://script.google.com/")) {
+                if(!silent) showToast("💾 已儲存至本機");
+                return;
+            }
+
+            statusEl.innerText = "☁️ 同步中...";
+            fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ tasks: tasks, staff: staffList, categories: categoryList })
+            })
+            .then(() => { statusEl.innerText = "☁️ 雲端同步中"; if(!silent) showToast("☁️ 已同步"); })
+            .catch(() => { statusEl.innerText = "⚠️ 同步失敗"; });
+        }
+
+        // ==========================================
+        // 💾 資料庫設定 Modal (DB Settings)
+        // ==========================================
+        window.openDbSettings = function() { 
+            const savedUrl = getSafeLocalItem('financeTrackerApiUrl') || DEFAULT_CLOUD_URL;
+            if (savedUrl) {
+                document.getElementById('radioCloud').checked = true;
+                document.getElementById('cloudUrlInputContainer').style.display = 'block';
+                document.getElementById('apiUrlInput').value = savedUrl;
+            } else {
+                document.getElementById('radioLocal').checked = true;
+                document.getElementById('cloudUrlInputContainer').style.display = 'none';
+                document.getElementById('apiUrlInput').value = '';
+            }
+            document.getElementById('dbSettingsModal').style.display = 'flex'; 
+        };
+        
+        window.closeDbSettings = function() { document.getElementById('dbSettingsModal').style.display = 'none'; };
+
+        window.toggleStorageInput = function() {
+            const isCloud = document.getElementById('radioCloud').checked;
+            document.getElementById('cloudUrlInputContainer').style.display = isCloud ? 'block' : 'none';
+        };
+
+        window.saveStorageSettings = function() {
+            const isCloud = document.getElementById('radioCloud').checked;
+            if (isCloud) {
+                const url = document.getElementById('apiUrlInput').value.trim();
+                if (!url.startsWith("https://script.google.com/")) {
+                    alert("請輸入正確嘅 Google Apps Script 網址！");
+                    return;
+                }
+                setSafeLocalItem('financeTrackerApiUrl', url);
+                API_URL = url;
+                showToast("✅ 已切換至雲端模式");
+                loadDataFromCloud();
+            } else {
+                try { localStorage.removeItem('financeTrackerApiUrl'); } catch(e){}
+                API_URL = "";
+                showToast("💻 已切換至本機模式");
+                loadDataFromLocal();
+            }
+            closeDbSettings();
+        };
+
+        // ==========================================
+        // 📦 匯出與匯入 (Export & Import)
+        // ==========================================
+        window.exportToJSON = function() {
+            const data = { tasks: tasks, staff: staffList, categories: categoryList };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "finance_tasks_backup.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            showToast("📦 JSON 備份已下載");
+        };
+
+        window.importFromJSON = function() {
+            const fileInput = document.getElementById('importJsonFile');
+            const file = fileInput.files[0];
+            if (!file) { alert("請先選擇 JSON 檔案！"); return; }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    tasks = data.tasks || [];
+                    staffList = data.staff || [];
+                    categoryList = data.categories || [];
+                    saveTasks(true);
+                    renderStaffOptions(); renderCategoryOptions(); renderTasks(); initSortable();
+                    showToast("📥 匯入成功！");
+                    closeDbSettings();
+                } catch(error) {
+                    alert("檔案格式錯誤！");
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        window.exportToCSV = function() {
+            if (tasks.length === 0) { showToast("⚠️ 無任務可匯出"); return; }
+            const headers = ['ID', 'Task Name', 'Category', 'Type', 'Frequency(Months)', 'Assignee', 'Deadline', 'Status', 'Remark'];
+            const csvRows = [];
+            csvRows.push(headers.join(','));
+
+            tasks.forEach(t => {
+                const row = [
+                    t.id,
+                    `"${(t.name || '').replace(/"/g, '""')}"`,
+                    `"${(t.category || '').replace(/"/g, '""')}"`,
+                    t.type,
+                    t.frequency || (t.type === 'Routine' ? '1' : 'N/A'),
+                    `"${(t.assignee || '').replace(/"/g, '""')}"`,
+                    t.deadline,
+                    t.status,
+                    `"${(t.remark || '').replace(/"/g, '""')}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvString = "\uFEFF" + csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "finance_tasks_report.csv";
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("📊 CSV 已下載");
+        };
+
+        // ==========================================
+        // 📅 日曆視圖功能 (Calendar View)
+        // ==========================================
+        window.openCalendarModal = function() {
+            document.getElementById('calendarModal').style.display = 'flex';
+            setTimeout(() => {
+                if (calendarApp) {
+                    calendarApp.updateSize();
+                    renderCalendar();
+                } else {
+                    renderCalendar();
+                }
+            }, 50);
+        };
+
+        window.closeCalendarModal = function() {
+            document.getElementById('calendarModal').style.display = 'none';
+        };
+
+        function renderCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            const selectedStaff = document.getElementById('staffFilter').value;
+            const selectedCategory = document.getElementById('categoryFilter').value;
+            
+            const events = tasks.filter(t => {
+                if (selectedStaff !== "ALL" && t.assignee !== selectedStaff) return false;
+                if (selectedCategory !== "ALL" && t.category !== selectedCategory) return false;
+                if (t.deadline === 'ASAP') return false;
+                return true;
+            }).map(t => {
+                let color = t.type === 'Routine' ? 'var(--routine)' : 'var(--adhoc)';
+                if (t.status === 'done') color = '#a5adba';
+                
+                let titlePrefix = t.status === 'done' ? '✅ ' : '';
+                let catText = t.category ? `[${t.category}] ` : '';
+                
+                return {
+                    id: t.id,
+                    title: `${titlePrefix}${catText}[${t.assignee}] ${t.name}`,
+                    start: t.deadline,
+                    color: color,
+                    extendedProps: { remark: t.remark }
+                };
+            });
+
+            if (!calendarApp) {
+                calendarApp = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    height: '100%',
+                    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+                    events: events,
+                    eventClick: function(info) { 
+                        openEditModal(info.event.id); 
+                    },
+                    dateClick: function(info) {
+                        openDayTasksModal(info.dateStr);
+                    }
+                });
+                calendarApp.render();
+            } else {
+                calendarApp.removeAllEvents();
+                calendarApp.addEventSource(events);
+            }
+        }
+
+        // ==========================================
+        // 📑 特定日任務清單 Modal (Day Tasks View)
+        // ==========================================
+        window.openDayTasksModal = function(dateStr) {
+            const dayTasks = tasks.filter(t => t.deadline === dateStr);
+            const container = document.getElementById('dayTasksContainer');
+            document.getElementById('dayTasksTitle').innerText = `📅 任務清單 - ${dateStr}`;
+
+            if (dayTasks.length === 0) {
+                container.innerHTML = '<div style="text-align:center; color:#5e6c84; padding: 20px 0;">呢日暫時無任務 🎉</div>';
+            } else {
+                let html = '<div class="day-tasks-list">';
+                dayTasks.forEach(task => {
+                    let typeColor = task.type === 'Routine' ? 'var(--routine)' : 'var(--adhoc)';
+                    let badgeClass = task.type === 'Routine' ? 'routine' : 'adhoc';
+                    let statusMap = { 'todo': 'To Do', 'review-am': '1st Review', 'review-boss': 'Final Review', 'done': '✅ Done' };
+                    let statusText = statusMap[task.status] || task.status;
+                    let isDone = task.status === 'done';
+                    
+                    let titleClass = isDone ? 'day-task-title done' : 'day-task-title';
+                    let badgeStyle = isDone ? 'style="background:#a5adba;"' : '';
+                    
+                    html += `
+                    <div class="day-task-card" style="border-left: 4px solid ${isDone ? '#a5adba' : typeColor};">
+                        <div class="day-task-details">
+                            <div class="${titleClass}">
+                                ${escapeHTML(task.name)} <span class="badge ${badgeClass}" ${badgeStyle}>${task.type}</span>
+                            </div>
+                            <div class="day-task-meta">
+                                👤 ${escapeHTML(task.assignee)} | 🏷️ ${escapeHTML(task.category)} | 📌 <strong>${statusText}</strong>
+                            </div>
+                        </div>
+                        <button class="btn-edit" style="margin-left:10px;" onclick="closeDayTasksModal(); openEditModal('${task.id}')">修改</button>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            document.getElementById('dayTasksModal').style.display = 'flex';
+        };
+
+        window.closeDayTasksModal = function() {
+            document.getElementById('dayTasksModal').style.display = 'none';
+        };
+
+        // ==========================================
+        // 🖥️ 主要任務渲染引擎 (Render Tasks & Kanban)
+        // ==========================================
+        function renderTasks() {
+            if (document.getElementById('calendarModal').style.display === 'flex' && calendarApp) { 
+                renderCalendar(); 
+            }
+
+            document.querySelectorAll('.list-group').forEach(el => el.innerHTML = '');
+            const urgentList = document.getElementById('urgentList');
+            urgentList.innerHTML = '';
+            
+            let urgentCount = 0;
+            const todayObj = new Date();
+            todayObj.setHours(0, 0, 0, 0);
+            const todayMs = todayObj.getTime();
+            
+            const selectedStaff = document.getElementById('staffFilter').value;
+            const selectedCategory = document.getElementById('categoryFilter').value;
+
+            const futureDivider = document.getElementById('routine-future-divider');
+            if(futureDivider) futureDivider.style.display = 'none';
+            let hasFutureTasks = false;
+
+            tasks.sort((a, b) => {
+                if (a.deadline === 'ASAP' && b.deadline !== 'ASAP') return -1;
+                if (a.deadline !== 'ASAP' && b.deadline === 'ASAP') return 1;
+                if (a.deadline === 'ASAP' && b.deadline === 'ASAP') return 0;
+                return new Date(a.deadline) - new Date(b.deadline);
+            });
+
+            tasks.forEach(task => {
+                if (selectedStaff !== "ALL" && task.assignee !== selectedStaff) return;
+                if (selectedCategory !== "ALL" && task.category !== selectedCategory) return;
+
+                const typeClass = task.type === 'Routine' ? 'routine' : 'adhoc';
+                const boardPrefix = task.type === 'Routine' ? 'routine' : 'adhoc';
+                
+                const card = document.createElement('div');
+                card.className = `card ${typeClass}`;
+                card.dataset.id = task.id;
+                card.onclick = function(e) {
+                    if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') {
+                        toggleCard(this);
+                    }
+                };
+                
+                let deadlineClass = '';
+                let overdueWarning = '';
+                let displayDate = task.deadline;
+                let isUrgent = false;
+                let isOverdue = false; 
+                let isFuture = false; 
+                
+                if (task.status !== 'done') {
+                    if (task.deadline === 'ASAP') {
+                        deadlineClass = 'text-urgent';
+                        overdueWarning = '⚡ ';
+                        isUrgent = true;
+                    } else {
+                        const taskDate = new Date(task.deadline);
+                        taskDate.setHours(0,0,0,0);
+                        const diffDays = Math.ceil((taskDate.getTime() - todayMs) / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) {
+                            deadlineClass = 'text-urgent';
+                            overdueWarning = '🔴 ';
+                            isUrgent = true;
+                            isOverdue = true; 
+                        } else if (diffDays <= 3) {
+                            deadlineClass = 'text-warning';
+                            overdueWarning = '⏳ ';
+                            isUrgent = true;
+                        } else if (diffDays <= 7) {
+                            isUrgent = true;
+                        } else if (diffDays > 30) {
+                            isFuture = true; 
+                        }
+                    }
+                    
+                    if (isUrgent) {
+                        urgentCount++;
+                        let sText = task.status === 'review-am' ? ' <strong class="urgent-review-am">(等你 Review)</strong>' : 
+                                    (task.status === 'review-boss' ? ' (等老細批)' : ' (未完成)');
+                        let overdueDashboardText = isOverdue ? ' <strong class="urgent-overdue-badge">🔴 已過期</strong>' : '';
+
+                        urgentList.innerHTML += `<li><strong>${displayDate}</strong> - ${escapeHTML(task.name)} [負責人: ${escapeHTML(task.assignee)}] ${sText}${overdueDashboardText}</li>`;
+                    }
+                }
+                
+                const remarkHtml = task.remark ? `<div class="task-remark-text">📝 備註: ${escapeHTML(task.remark)}</div>` : '';
+                
+                let freqBadge = '';
+                if(task.type === 'Routine' && task.frequency) {
+                    const fMap = {'1':'每月', '2':'2個月', '3':'每季', '6':'半年', '12':'每年'};
+                    freqBadge = `<span class="badge freq">🔁 ${fMap[task.frequency]||'每月'}</span>`;
+                }
+
+                // 新增：生成子任務清單的 HTML
+                let subtasksHtml = '';
+                if (task.subtasks && task.subtasks.length > 0) {
+                    const completedCount = task.subtasks.filter(st => st.done).length;
+                    const totalCount = task.subtasks.length;
+                    
+                    subtasksHtml = `<div class="subtasks-container">
+                        <div class="subtasks-header">✅ 子任務 (${completedCount}/${totalCount})</div>`;
+                    
+                    task.subtasks.forEach((st, index) => {
+                        subtasksHtml += `
+                        <label style="display: flex; align-items: flex-start; gap: 5px; font-size: 13px; margin-bottom: 4px; cursor: pointer; color: ${st.done ? '#a5adba' : '#172b4d'}; text-decoration: ${st.done ? 'line-through' : 'none'};" onclick="event.stopPropagation()">
+                            <input type="checkbox" style="margin-top: 2px; cursor: pointer;" ${st.done ? 'checked' : ''} onchange="toggleSubtask(event, '${task.id}', ${index})">
+                            <span>${escapeHTML(st.text)}</span>
+                        </label>`;
+                    });
+                    subtasksHtml += `</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div style="display: flex; flex-direction: column;">
+                            ${task.category ? `<span class="badge category">${escapeHTML(task.category)}</span>` : ''}
+                            <span class="task-title">${escapeHTML(task.name)}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                            <span class="badge ${typeClass}">${task.type}</span>
+                            ${freqBadge}
+                        </div>
+                    </div>
+                    <div style="font-size: 13px; margin-top: 5px;">
+                        📅 <span class="${deadlineClass}">${overdueWarning}${displayDate}</span>
+                    </div>
+                    
+                    <div class="card-details-wrapper">
+                        <div class="card-details">
+                            👤 負責人: <strong>${escapeHTML(task.assignee)}</strong>
+                            ${remarkHtml}
+                            ${subtasksHtml}
+                        </div>
+                        <div class="card-actions">
+                            <select onchange="updateStatus('${task.id}', this.value)">
+                                <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>To Do</option>
+                                <option value="review-am" ${task.status === 'review-am' ? 'selected' : ''}>1st Review</option>
+                                <option value="review-boss" ${task.status === 'review-boss' ? 'selected' : ''}>Final Review</option>
+                                <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
+                            </select>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn-edit" onclick="openEditModal('${task.id}')">修改</button>
+                                <button class="btn-delete" onclick="openDeleteModal('${task.id}')">刪除</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                let targetListId = `${boardPrefix}-${task.status}-list`;
+                if (task.type === 'Routine' && task.status === 'todo' && isFuture) {
+                    targetListId = `routine-future-list`;
+                    card.classList.add('future-task');
+                    hasFutureTasks = true;
+                }
+
+                const targetList = document.getElementById(targetListId);
+                if (targetList) targetList.appendChild(card);
+            });
+            
+            if(futureDivider) futureDivider.style.display = hasFutureTasks ? 'flex' : 'none';
+            document.getElementById('urgentPanel').style.display = urgentCount > 0 ? 'block' : 'none';
+        }
+
+        // ==========================================
+        // 🔄 拖拉功能初始化 (SortableJS)
+        // ==========================================
+        function initSortable() {
+            document.querySelectorAll('.list-group').forEach(el => {
+                new Sortable(el, {
+                    group: el.dataset.type, 
+                    animation: 150,
+                    onEnd: function (evt) {
+                        const taskId = evt.item.dataset.id;
+                        const newStatus = evt.to.dataset.status;
+                        const task = tasks.find(t => String(t.id) === String(taskId));
+                        if (task && task.status !== newStatus) {
+                            task.status = newStatus;
+                            saveTasks(true);
+                            renderTasks(); 
+                        }
+                    }
+                });
+            });
+        }
+
+        // ==========================================
+        // 📝 任務增刪改查 (Task CRUD Actions)
+        // ==========================================
+        document.getElementById('taskForm').addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            const isASAP = document.getElementById('taskIsASAP').checked;
+            const deadline = isASAP ? 'ASAP' : document.getElementById('taskDeadline').value;
+            const taskType = document.getElementById('taskType').value;
+            const frequency = taskType === 'Routine' ? document.getElementById('taskFrequency').value : '';
+            
+            // 處理子任務清單
+            const subtasksText = document.getElementById('taskSubtasks').value;
+            const parsedSubtasks = subtasksText.split('\n').filter(l => l.trim() !== '').map(text => ({ text: text.trim(), done: false }));
+
+            tasks.push({
+                id: (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()) + Math.random().toString(36).substring(2),
+                name: document.getElementById('taskName').value,
+                category: document.getElementById('taskCategory').value,
+                type: taskType,
+                frequency: frequency,
+                assignee: document.getElementById('taskAssignee').value,
+                deadline: deadline,
+                remark: document.getElementById('taskRemark').value,
+                subtasks: parsedSubtasks,
+                status: 'todo' 
+            });
+            
+            saveTasks(true); renderTasks(); showToast('✅ 任務新增成功！');
+            
+            document.getElementById('taskName').value = '';
+            document.getElementById('taskRemark').value = '';
+            document.getElementById('taskSubtasks').value = ''; // 清空子任務輸入框
+            const asapCb = document.getElementById('taskIsASAP');
+            asapCb.checked = false;
+            window.toggleDeadline(asapCb, 'taskDeadline');
+        });
+
+        window.updateStatus = function(id, newStatus) {
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (task) { task.status = newStatus; saveTasks(true); renderTasks(); }
+        };
+
+        // 新增：處理剔子任務嘅動作
+        window.toggleSubtask = function(event, taskId, index) {
+            const task = tasks.find(t => String(t.id) === String(taskId));
+            if (task && task.subtasks && task.subtasks[index]) {
+                task.subtasks[index].done = event.target.checked;
+                saveTasks(true); 
+                
+                const label = event.target.parentElement;
+                label.style.color = event.target.checked ? '#a5adba' : '#172b4d';
+                label.style.textDecoration = event.target.checked ? 'line-through' : 'none';
+                
+                const completedCount = task.subtasks.filter(st => st.done).length;
+                const totalCount = task.subtasks.length;
+                const headerDiv = label.parentElement.querySelector('.subtasks-header');
+                if(headerDiv) headerDiv.innerText = `✅ 子任務 (${completedCount}/${totalCount})`;
+            }
+        };
+
+        // --- 🗑️ 刪除任務 ---
+        let taskToDeleteId = null;
+        window.openDeleteModal = function(id) { taskToDeleteId = id; document.getElementById('deleteModal').style.display = 'flex'; };
+        window.closeModal = function() { taskToDeleteId = null; document.getElementById('deleteModal').style.display = 'none'; };
+        
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+            if (taskToDeleteId) { 
+                tasks = tasks.filter(t => String(t.id) !== String(taskToDeleteId)); 
+                saveTasks(true); renderTasks(); closeModal(); 
+                showToast('🗑️ 任務已刪除');
+            }
+        });
+
+        // --- 🔁 結算 Routine ---
+        window.openResetModal = function() { document.getElementById('resetModal').style.display = 'flex'; };
+        window.closeResetModal = function() { document.getElementById('resetModal').style.display = 'none'; };
+        
+        document.getElementById('confirmResetBtn').addEventListener('click', function() {
+            let resetCount = 0;
+            tasks = tasks.map(task => {
+                if (task.type === 'Routine' && task.status === 'done') {
+                    task.status = 'todo';
+                    if (task.deadline && task.deadline !== 'ASAP') {
+                        const date = new Date(task.deadline);
+                        const freq = parseInt(task.frequency) || 1;
+                        date.setMonth(date.getMonth() + freq);
+                        task.deadline = getLocalDateString(date);
+                    }
+                    // 將所有子任務嘅剔號清空
+                    if(task.subtasks) {
+                        task.subtasks.forEach(st => st.done = false);
+                    }
+                    resetCount++;
+                }
+                return task;
+            });
+            
+            tasks = tasks.filter(task => !(task.type === 'Ad-hoc' && task.status === 'done'));
+            saveTasks(true); renderTasks(); closeResetModal();
+            showToast(`✅ 結算完成！推遲咗 ${resetCount} 個 Routine 任務。`);
+        });
+
+        // --- ✏️ 編輯任務 ---
+        let taskToEditId = null;
+        window.openEditModal = function(id) {
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (!task) return;
+            taskToEditId = id;
+            document.getElementById('editTaskName').value = task.name;
+            document.getElementById('editTaskCategory').value = task.category || (categoryList.length > 0 ? categoryList[0] : '');
+            
+            const typeSelect = document.getElementById('editTaskType');
+            typeSelect.value = task.type;
+            const isRoutine = task.type === 'Routine';
+            document.getElementById('editTaskFrequency').style.display = isRoutine ? 'block' : 'none';
+            document.getElementById('editFrequencyLabel').style.display = isRoutine ? 'block' : 'none';
+            document.getElementById('editTaskFrequency').value = task.frequency || '1';
+
+            document.getElementById('editTaskAssignee').value = task.assignee;
+            document.getElementById('editTaskRemark').value = task.remark || '';
+            
+            // 讀取子任務清單入 Textarea
+            document.getElementById('editTaskSubtasks').value = (task.subtasks || []).map(st => st.text).join('\n');
+            
+            const isASAP = task.deadline === 'ASAP';
+            const asapCb = document.getElementById('editTaskIsASAP');
+            asapCb.checked = isASAP;
+            const dateInput = document.getElementById('editTaskDeadline');
+            
+            if (isASAP) {
+                dateInput.value = '';
+                dateInput.disabled = true;
+                dateInput.style.backgroundColor = '#ebecf0';
+            } else {
+                dateInput.value = task.deadline;
+                dateInput.disabled = false;
+                dateInput.style.backgroundColor = 'white';
+            }
+            
+            document.getElementById('editModal').style.display = 'flex';
+        };
+        
+        window.closeEditModal = function() { taskToEditId = null; document.getElementById('editModal').style.display = 'none'; };
+        
+        document.getElementById('confirmEditBtn').addEventListener('click', function() {
+            if (taskToEditId) {
+                const task = tasks.find(t => String(t.id) === String(taskToEditId));
+                if (task) {
+                    task.name = document.getElementById('editTaskName').value;
+                    task.category = document.getElementById('editTaskCategory').value;
+                    task.type = document.getElementById('editTaskType').value;
+                    task.frequency = task.type === 'Routine' ? document.getElementById('editTaskFrequency').value : '';
+                    task.assignee = document.getElementById('editTaskAssignee').value;
+                    task.remark = document.getElementById('editTaskRemark').value;
+                    
+                    // 更新子任務 (保留已有嘅打剔狀態)
+                    const newSubtexts = document.getElementById('editTaskSubtasks').value.split('\n').filter(l => l.trim() !== '');
+                    task.subtasks = newSubtexts.map(text => {
+                        const existing = (task.subtasks || []).find(st => st.text === text.trim());
+                        return { text: text.trim(), done: existing ? existing.done : false };
+                    });
+                    
+                    const isASAP = document.getElementById('editTaskIsASAP').checked;
+                    task.deadline = isASAP ? 'ASAP' : document.getElementById('editTaskDeadline').value;
+                    
+                    saveTasks(true); renderTasks(); closeEditModal();
+                    showToast('✏️ 修改成功！');
+                }
+            }
+        });
+
+        // ==========================================
+        // 👤 員工管理模組 (Staff Settings)
+        // ==========================================
+        function renderStaffOptions() {
+            const addSelect = document.getElementById('taskAssignee');
+            const editSelect = document.getElementById('editTaskAssignee');
+            const filterSelect = document.getElementById('staffFilter');
+            const currentFilter = filterSelect.value;
+            
+            addSelect.innerHTML = ''; editSelect.innerHTML = '';
+            filterSelect.innerHTML = '<option value="ALL">🌟 全部 (All Team)</option>';
+            
+            staffList.forEach(staff => {
+                addSelect.innerHTML += `<option value="${staff}">${staff}</option>`;
+                editSelect.innerHTML += `<option value="${staff}">${staff}</option>`;
+                filterSelect.innerHTML += `<option value="${staff}">👤 ${staff}</option>`;
+            });
+            filterSelect.value = currentFilter || "ALL";
+        }
+
+        window.openStaffSettings = function() { renderStaffSettingsList(); document.getElementById('staffSettingsModal').style.display = 'flex'; };
+        window.closeStaffSettings = function() { document.getElementById('staffSettingsModal').style.display = 'none'; };
+
+        function renderStaffSettingsList() {
+            const container = document.getElementById('staffListContainer');
+            container.innerHTML = '';
+            staffList.forEach((staff, index) => {
+                container.innerHTML += `<div class="staff-list-item"><span>👤 <strong>${staff}</strong></span><button onclick="removeStaff(${index})">移除</button></div>`;
+            });
+        }
+
+        window.addNewStaff = function() {
+            const name = document.getElementById('newStaffName').value.trim();
+            if (name && !staffList.includes(name)) {
+                staffList.push(name);
+                renderStaffSettingsList(); renderStaffOptions();
+                document.getElementById('newStaffName').value = '';
+                saveTasks(true); showToast('👤 同事已加入');
+            }
+        };
+
+        window.removeStaff = function(index) {
+            staffList.splice(index, 1);
+            renderStaffSettingsList(); renderStaffOptions();
+            saveTasks(true); showToast('🗑️ 同事已移除');
+        };
+
+        // ==========================================
+        // 🏷️ 分類管理模組 (Category Settings)
+        // ==========================================
+        function renderCategoryOptions() {
+            const addSelect = document.getElementById('taskCategory');
+            const editSelect = document.getElementById('editTaskCategory');
+            const filterSelect = document.getElementById('categoryFilter');
+            const currentFilter = filterSelect.value;
+            
+            addSelect.innerHTML = ''; editSelect.innerHTML = '';
+            filterSelect.innerHTML = '<option value="ALL">🌟 全部分類</option>';
+            
+            categoryList.forEach(cat => {
+                addSelect.innerHTML += `<option value="${escapeHTML(cat)}">${escapeHTML(cat)}</option>`;
+                editSelect.innerHTML += `<option value="${escapeHTML(cat)}">${escapeHTML(cat)}</option>`;
+                filterSelect.innerHTML += `<option value="${escapeHTML(cat)}">📂 ${escapeHTML(cat)}</option>`;
+            });
+            filterSelect.value = currentFilter || "ALL";
+        }
+
+        window.openCategorySettings = function() { renderCategorySettingsList(); document.getElementById('categorySettingsModal').style.display = 'flex'; };
+        window.closeCategorySettings = function() { document.getElementById('categorySettingsModal').style.display = 'none'; };
+
+        function renderCategorySettingsList() {
+            const container = document.getElementById('categoryListContainer');
+            container.innerHTML = '';
+            categoryList.forEach((cat, index) => {
+                container.innerHTML += `<div class="staff-list-item"><span>🏷️ <strong>${escapeHTML(cat)}</strong></span><button onclick="removeCategory(${index})">移除</button></div>`;
+            });
+        }
+
+        window.addNewCategory = function() {
+            const name = document.getElementById('newCategoryName').value.trim();
+            if (name && !categoryList.includes(name)) {
+                categoryList.push(name);
+                renderCategorySettingsList(); renderCategoryOptions();
+                document.getElementById('newCategoryName').value = '';
+                saveTasks(true); showToast('🏷️ 分類已加入');
+            }
+        };
+
+        window.removeCategory = function(index) {
+            categoryList.splice(index, 1);
+            renderCategorySettingsList(); renderCategoryOptions();
+            saveTasks(true); showToast('🗑️ 分類已移除');
+        };
+    </script>
+</body>
+</html>
