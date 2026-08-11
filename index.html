@@ -584,7 +584,7 @@
                     let fetchedTasks = data.tasks || [];
                     tasks = fetchedTasks.map(t => {
                         if (t.deadline && t.deadline !== 'ASAP' && typeof t.deadline === 'string' && t.deadline.includes('T')) {
-                            t.deadline = t.deadline.split('T')[0];
+                            t.deadline = getLocalDateString(new Date(t.deadline));
                         }
                         return t;
                     });
