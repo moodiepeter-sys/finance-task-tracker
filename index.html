@@ -204,6 +204,7 @@
         </div>
 
         <div class="flex-group align-items-center">
+            <!-- 新增：已完成 Ad-hoc Tasks 歸檔按鈕 -->
             <button class="btn-settings btn-archive" onclick="openArchiveModal()">📦 已完成既 ad-hoc tasks</button>
             <div class="flex-center-gap">
                 <button class="btn-settings" onclick="openStaffSettings()">⚙️ 員工管理</button>
@@ -402,6 +403,7 @@
         </div>
     </div>
 
+    <!-- 新增：歸檔庫 Archive Modal -->
     <div class="modal-overlay" id="archiveModal">
         <div class="modal-content" style="width: 500px; max-width: 95%; max-height: 80vh; display: flex; flex-direction: column;">
             <h3 style="margin-top:0; color:var(--adhoc);">📦 已完成既 ad-hoc tasks</h3>
@@ -412,6 +414,7 @@
         </div>
     </div>
 
+    <!-- 新增：歷史紀錄 History Modal -->
     <div class="modal-overlay" id="historyModal" style="z-index: 10001;">
         <div class="modal-content" style="width: 400px; max-width: 95%; text-align: left;">
             <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;">📜 任務歷史 <span style="font-size: 12px; font-weight:normal; color:#5e6c84;">(Audit Trail)</span></h3>
@@ -452,7 +455,6 @@
         </div>
     </div>
 
-    <!-- 💾 資料庫設定 Modal (已更新為輸入 Google Sheet ID) -->
     <div class="modal-overlay" id="dbSettingsModal">
         <div class="modal-content" style="text-align: left;">
             <h3 style="margin-top:0; color:#172b4d; text-align: center;">💾 資料庫設定</h3>
@@ -467,9 +469,8 @@
                     <span>☁️ Google Sheet (雲端同步)</span>
                 </label>
                 <div id="cloudUrlInputContainer" style="display: none; margin-top: 10px;">
-                    <label style="font-size: 12px; color: #5e6c84; display: block; margin-bottom: 4px;">請輸入你的 Google Sheet ID：</label>
-                    <input type="text" id="sheetIdInput" placeholder="例如：1BxiMVs0XRA5nFMdKvBdBZjgmUU..." style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 8px;">
-                    <span style="font-size: 11px; color: #8993a4; margin-top: 4px; display: block;">💡 Sheet ID 位於網址 `/d/` 與 `/edit` 中間。請確保該 Sheet 已開放「知道連結的人可編輯」。</span>
+                    <input type="text" id="apiUrlInput" placeholder="貼上你的 Google Sheet ID (例如: 1BxiMVs0X...)" style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 8px;">
+                    <small style="color: #5e6c84; display: block; margin-top: 4px;">💡 Sheet ID 為網址 /d/ 與 /edit 中間嗰串亂碼</small>
                 </div>
             </div>
             <div class="db-settings-section db-settings-export">
@@ -494,23 +495,29 @@
         // ==========================================
         // 🔧 全局設定與初始化 (Initialization)
         // ==========================================
-        // 最新部署的通用轉運站 Apps Script URL (所有使用者共用此 URL)
         const DEFAULT_CLOUD_URL = "https://script.google.com/macros/s/AKfycbw7kJFrU1Ckn6dYtAJqdDRRpLgEXldQN9zVuIPoEycIDNfuEFT9FBrh0CxgHcIEg-624w/exec"; 
 
-        let API_URL = DEFAULT_CLOUD_URL; 
+        let API_URL = ""; 
         let tasks = [];
         let staffList = [];
         let categoryList = [];
         let calendarApp = null;
         
+        // 狀態名稱對照表 (供 History 使用)
         const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review (我睇)', 'review-boss': 'Final Review (我腦細睇)', 'done': 'Done', 'archived': '已歸檔' };
 
         window.onload = function() {
-            const savedSheetId = getSafeLocalItem('userSheetId');
-            if (savedSheetId && DEFAULT_CLOUD_URL) {
-                API_URL = DEFAULT_CLOUD_URL;
-                loadDataFromCloud();
-            } else {
+            try {
+                const savedSheetId = getSafeLocalItem('userSheetId');
+                if (savedSheetId) {
+                    API_URL = DEFAULT_CLOUD_URL;
+                    loadDataFromCloud();
+                } else {
+                    loadDataFromLocal();
+                }
+            } catch (e) {
+                console.warn("LocalStorage 存取受限，將強制使用本機模式");
+                API_URL = "";
                 loadDataFromLocal();
             }
 
@@ -533,6 +540,7 @@
             return new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
         }
         
+        // 取得當前時間字串，例如 2026-08-11 14:30 (供 History 使用)
         function getCurrentDateTime() {
             const now = new Date();
             const y = now.getFullYear();
@@ -609,7 +617,6 @@
                 statusEl.innerText = "⚠️ 未設定 Sheet ID";
                 statusEl.style.background = "#ffebe6";
                 statusEl.style.color = "#de350b";
-                loadDataFromLocal();
                 return;
             }
 
@@ -617,7 +624,7 @@
             statusEl.style.background = "#e6efff";
             statusEl.style.color = "#0052cc";
 
-            const fetchUrl = `${API_URL}?sheetId=${encodeURIComponent(userSheetId)}`;
+            const fetchUrl = `${DEFAULT_CLOUD_URL}?sheetId=${encodeURIComponent(userSheetId)}`;
 
             fetch(fetchUrl)
                 .then(response => response.json())
@@ -627,6 +634,7 @@
                     }
                     let fetchedTasks = data.tasks || [];
                     tasks = fetchedTasks.map(t => {
+                        // 修正時區 Bug：將 UTC 轉換回 Local Time
                         if (t.deadline && t.deadline !== 'ASAP' && typeof t.deadline === 'string' && t.deadline.includes('T')) {
                             t.deadline = getLocalDateString(new Date(t.deadline));
                         }
@@ -642,7 +650,7 @@
                     statusEl.style.color = "#006644";
                 })
                 .catch(error => {
-                    console.error("雲端讀取失敗:", error);
+                    console.error(error);
                     loadDataFromLocal(); 
                     statusEl.innerText = "⚠️ 連線失敗 (本機模式)";
                     statusEl.style.background = "#ffebe6";
@@ -683,8 +691,7 @@
                     statusEl.style.color = "#de350b";
                 }
             })
-            .catch((err) => { 
-                console.error("雲端儲存失敗:", err);
+            .catch(() => { 
                 statusEl.innerText = "⚠️ 同步失敗"; 
                 statusEl.style.background = "#ffebe6";
                 statusEl.style.color = "#de350b";
@@ -699,11 +706,11 @@
             if (savedSheetId) {
                 document.getElementById('radioCloud').checked = true;
                 document.getElementById('cloudUrlInputContainer').style.display = 'block';
-                document.getElementById('sheetIdInput').value = savedSheetId;
+                document.getElementById('apiUrlInput').value = savedSheetId;
             } else {
                 document.getElementById('radioLocal').checked = true;
                 document.getElementById('cloudUrlInputContainer').style.display = 'none';
-                document.getElementById('sheetIdInput').value = '';
+                document.getElementById('apiUrlInput').value = '';
             }
             document.getElementById('dbSettingsModal').style.display = 'flex'; 
         };
@@ -717,17 +724,19 @@
         window.saveStorageSettings = function() {
             const isCloud = document.getElementById('radioCloud').checked;
             if (isCloud) {
-                const sheetId = document.getElementById('sheetIdInput').value.trim();
+                const sheetId = document.getElementById('apiUrlInput').value.trim();
                 if (!sheetId) {
                     alert("請輸入有效的 Google Sheet ID！");
                     return;
                 }
                 setSafeLocalItem('userSheetId', sheetId);
                 API_URL = DEFAULT_CLOUD_URL;
-                showToast("✅ 已儲存 Sheet ID，切換至雲端模式");
+                showToast("✅ 已切換至雲端模式");
                 loadDataFromCloud();
             } else {
-                try { localStorage.removeItem('userSheetId'); } catch(e){}
+                try { 
+                    localStorage.removeItem('userSheetId');
+                } catch(e){}
                 API_URL = "";
                 showToast("💻 已切換至本機模式");
                 loadDataFromLocal();
@@ -828,7 +837,7 @@
             const selectedCategory = document.getElementById('categoryFilter').value;
             
             const events = tasks.filter(t => {
-                if (t.status === 'archived') return false;
+                if (t.status === 'archived') return false; // 隱藏已歸檔
                 if (selectedStaff !== "ALL" && t.assignee !== selectedStaff) return false;
                 if (selectedCategory !== "ALL" && t.category !== selectedCategory) return false;
                 if (t.deadline === 'ASAP') return false;
@@ -938,7 +947,7 @@
             });
 
             tasks.forEach(task => {
-                if (task.status === 'archived') return;
+                if (task.status === 'archived') return; // 不顯示已歸檔任務
                 if (selectedStaff !== "ALL" && task.assignee !== selectedStaff) return;
                 if (selectedCategory !== "ALL" && task.category !== selectedCategory) return;
 
@@ -1052,6 +1061,7 @@
                                 <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
                             </select>
                             <div style="display: flex; gap: 5px;">
+                                <!-- 新增：歷史按鈕 -->
                                 <button class="btn-history" onclick="openHistoryModal('${task.id}')">📜 歷史</button>
                                 <button class="btn-edit" onclick="openEditModal('${task.id}')">修改</button>
                                 <button class="btn-delete" onclick="openDeleteModal('${task.id}')">刪除</button>
@@ -1127,6 +1137,7 @@
                 remark: document.getElementById('taskRemark').value,
                 subtasks: parsedSubtasks,
                 status: 'todo',
+                // 新增：寫入建立歷史
                 history: [{ time: getCurrentDateTime(), log: `➕ 建立任務` }]
             });
             
@@ -1208,6 +1219,7 @@
                     task.history.push({ time: getCurrentDateTime(), log: `🔁 結算 Routine: 狀態重置為 To Do，延期至 ${task.deadline}` });
                     resetCount++;
                 } else if (task.type === 'Ad-hoc' && task.status === 'done') {
+                    // 將刪除改為歸檔 (Archived)
                     task.status = 'archived';
                     task.history.push({ time: getCurrentDateTime(), log: `📦 結算 Ad-hoc: 移入歸檔庫` });
                     archiveCount++;
@@ -1358,7 +1370,7 @@
                 task.history.push({ time: getCurrentDateTime(), log: `↩️ 由歸檔庫還原至 Done 狀態` });
                 saveTasks(true); 
                 renderTasks(); 
-                renderArchiveList();
+                renderArchiveList(); // 即時更新歸檔庫畫面
                 showToast("✅ 任務已還原至看板");
             }
         };
