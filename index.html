@@ -966,7 +966,7 @@
                     if (isUrgent) {
                         urgentCount++;
                         let sText = task.status === 'review-am' ? ' <strong class="urgent-review-am">(等你 Review)</strong>' : 
-                                    (task.status === 'review-boss' ? ' (等老細批)' : ' (未完成)');
+                                    (task.status === 'review-boss' ? ' (等腦細批)' : ' (未完成)');
                         let overdueDashboardText = isOverdue ? ' <strong class="urgent-overdue-badge">🔴 已過期</strong>' : '';
 
                         urgentList.innerHTML += `<li><strong>${displayDate}</strong> - ${escapeHTML(task.name)} [負責人: ${escapeHTML(task.assignee)}] ${sText}${overdueDashboardText}</li>`;
