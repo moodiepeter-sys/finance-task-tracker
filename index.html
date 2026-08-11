@@ -135,6 +135,9 @@
         .fc-daygrid-day:hover { background-color: #f4f5f7 !important; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(9, 30, 66, 0.54); display: none; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-top { z-index: 10000; }
+        .modal-topmost { z-index: 10001; }
+
         .modal-content { background: white; padding: 24px; border-radius: 8px; width: 350px; max-width: 90%; text-align: center; }
         
         .modal-calendar-content { width: 95%; height: 90%; max-width: 1200px; padding: 20px; display: flex; flex-direction: column; text-align: left; box-sizing: border-box; }
@@ -161,7 +164,7 @@
         .day-task-meta { font-size: 12px; color: #5e6c84; }
 
         /* ==========================================
-           ⚙️ 6. 設定與管理 (Settings & Lists)
+           ⚙️ 6. 設定、歷史與歸檔 (Settings, History & Archive)
            ========================================== */
         .staff-list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #dfe1e6; }
         .staff-list-item button { background: transparent; color: var(--adhoc); border: 1px solid var(--adhoc); padding: 4px 8px; border-radius: 4px; cursor: pointer; }
@@ -172,6 +175,14 @@
         .db-settings-export { background: #e6efff; border: 1px solid #b3d4ff; }
         .db-settings-title { display: block; margin-bottom: 8px; color: #172b4d; }
         .db-settings-title.export { color: #0052cc; }
+
+        .archive-card { background: #f4f5f7; padding: 12px; border-radius: 6px; border-left: 4px solid var(--adhoc); }
+        .archive-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .archive-card-actions { margin-top: 10px; display: flex; gap: 8px; }
+        
+        .history-item { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #dfe1e6; }
+        .history-time { color: #8993a4; font-size: 11px; margin-bottom: 4px; }
+        .history-log { color: #172b4d; }
 
         @media (max-width: 768px) {
             .board { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-padding: 0 10px; padding-bottom: 20px; }
@@ -321,7 +332,7 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="dayTasksModal" style="z-index: 10000;">
+    <div class="modal-overlay modal-top" id="dayTasksModal">
         <div class="modal-content modal-day-tasks-content">
             <div class="modal-day-tasks-header">
                 <h3 id="dayTasksTitle" class="modal-day-tasks-title">📅 任務清單</h3>
@@ -355,7 +366,7 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="editModal" style="z-index: 10000;">
+    <div class="modal-overlay modal-top" id="editModal">
         <div class="modal-content" style="text-align: left;">
             <h3 style="margin-top:0; color:#172b4d; text-align: center;">✏️ 編輯任務</h3>
             <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -415,7 +426,7 @@
     </div>
 
     <!-- 新增：歷史紀錄 History Modal -->
-    <div class="modal-overlay" id="historyModal" style="z-index: 10001;">
+    <div class="modal-overlay modal-topmost" id="historyModal">
         <div class="modal-content" style="width: 400px; max-width: 95%; text-align: left;">
             <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;">📜 任務歷史 <span style="font-size: 12px; font-weight:normal; color:#5e6c84;">(Audit Trail)</span></h3>
             <h4 id="historyTaskName" style="color:var(--primary); margin-top:0; margin-bottom: 15px; border-bottom: 2px solid #dfe1e6; padding-bottom: 8px;"></h4>
@@ -497,7 +508,6 @@
         // ==========================================
         const DEFAULT_CLOUD_URL = "https://script.google.com/macros/s/AKfycbw7kJFrU1Ckn6dYtAJqdDRRpLgEXldQN9zVuIPoEycIDNfuEFT9FBrh0CxgHcIEg-624w/exec"; 
 
-        let API_URL = ""; 
         let tasks = [];
         let staffList = [];
         let categoryList = [];
@@ -510,14 +520,12 @@
             try {
                 const savedSheetId = getSafeLocalItem('userSheetId');
                 if (savedSheetId) {
-                    API_URL = DEFAULT_CLOUD_URL;
                     loadDataFromCloud();
                 } else {
                     loadDataFromLocal();
                 }
             } catch (e) {
                 console.warn("LocalStorage 存取受限，將強制使用本機模式");
-                API_URL = "";
                 loadDataFromLocal();
             }
 
@@ -540,7 +548,6 @@
             return new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
         }
         
-        // 取得當前時間字串，例如 2026-08-11 14:30 (供 History 使用)
         function getCurrentDateTime() {
             const now = new Date();
             const y = now.getFullYear();
@@ -549,6 +556,11 @@
             const hh = String(now.getHours()).padStart(2, '0');
             const mm = String(now.getMinutes()).padStart(2, '0');
             return `${y}-${m}-${d} ${hh}:${mm}`;
+        }
+
+        function parseSubtasks(text) {
+            if (!text) return [];
+            return text.split('\n').filter(l => l.trim() !== '').map(t => ({ text: t.trim(), done: false }));
         }
 
         function showToast(message) {
@@ -666,13 +678,13 @@
             const statusEl = document.getElementById('cloudStatus');
             const userSheetId = getSafeLocalItem('userSheetId');
             
-            if (!API_URL || !userSheetId) {
+            if (!userSheetId) {
                 if(!silent) showToast("💾 已儲存至本機");
                 return;
             }
 
             statusEl.innerText = "☁️ 同步中...";
-            const fetchUrl = `${API_URL}?sheetId=${encodeURIComponent(userSheetId)}`;
+            const fetchUrl = `${DEFAULT_CLOUD_URL}?sheetId=${encodeURIComponent(userSheetId)}`;
 
             fetch(fetchUrl, {
                 method: 'POST',
@@ -730,14 +742,12 @@
                     return;
                 }
                 setSafeLocalItem('userSheetId', sheetId);
-                API_URL = DEFAULT_CLOUD_URL;
                 showToast("✅ 已切換至雲端模式");
                 loadDataFromCloud();
             } else {
                 try { 
                     localStorage.removeItem('userSheetId');
                 } catch(e){}
-                API_URL = "";
                 showToast("💻 已切換至本機模式");
                 loadDataFromLocal();
             }
@@ -1123,8 +1133,7 @@
             const taskType = document.getElementById('taskType').value;
             const frequency = taskType === 'Routine' ? document.getElementById('taskFrequency').value : '';
             
-            const subtasksText = document.getElementById('taskSubtasks').value;
-            const parsedSubtasks = subtasksText.split('\n').filter(l => l.trim() !== '').map(text => ({ text: text.trim(), done: false }));
+            const parsedSubtasks = parseSubtasks(document.getElementById('taskSubtasks').value);
 
             tasks.push({
                 id: (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()) + Math.random().toString(36).substring(2),
@@ -1315,9 +1324,9 @@
             } else {
                 let html = '';
                 task.history.forEach(h => {
-                    html += `<div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #dfe1e6;">
-                        <div style="color:#8993a4; font-size: 11px; margin-bottom: 4px;">🕒 ${h.time}</div>
-                        <div style="color:#172b4d;"><strong>${h.log}</strong></div>
+                    html += `<div class="history-item">
+                        <div class="history-time">🕒 ${h.time}</div>
+                        <div class="history-log"><strong>${h.log}</strong></div>
                     </div>`;
                 });
                 container.innerHTML = html;
@@ -1345,13 +1354,13 @@
             let html = '<div style="display:flex; flex-direction:column; gap: 12px;">';
             archivedTasks.forEach(t => {
                 html += `
-                    <div style="background:#f4f5f7; padding: 12px; border-radius:6px; border-left:4px solid var(--adhoc);">
-                        <div style="display:flex; justify-content:space-between; align-items: flex-start; gap:10px;">
+                    <div class="archive-card">
+                        <div class="archive-card-header">
                             <strong style="color:#172b4d;">${escapeHTML(t.name)}</strong>
                             <span style="font-size:12px; color:#5e6c84; white-space:nowrap;">👤 ${escapeHTML(t.assignee)}</span>
                         </div>
                         <div style="font-size:12px; margin-top:5px; color:#5e6c84;">📅 原定期限: ${t.deadline}</div>
-                        <div style="margin-top: 10px; display:flex; gap: 8px;">
+                        <div class="archive-card-actions">
                             <button class="btn-history" style="padding: 4px 8px; font-size: 11px; margin: 0;" onclick="openHistoryModal('${t.id}')">📜 睇 History</button>
                             <button class="btn-settings" style="padding: 4px 8px; font-size: 11px; background-color: var(--primary);" onclick="unarchiveTask('${t.id}')">↩️ 還原</button>
                         </div>
