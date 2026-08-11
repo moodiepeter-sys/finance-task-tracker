@@ -52,6 +52,7 @@
         .btn-settings { background-color: #5e6c84; color: white; padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
         .btn-settings:hover { background-color: #42526e; }
         .btn-category { background-color: #6554c0; }
+        .btn-archive { background-color: var(--adhoc); }
         .btn-db { background-color: #0052cc; }
         .btn-calendar-view { background-color: #6554c0; padding: 8px 15px; border-radius: 4px; border: none; color: white; font-weight: bold; cursor: pointer; }
         .btn-reset-routine { background-color: var(--routine); min-width: 150px; white-space: nowrap; }
@@ -104,6 +105,8 @@
         
         .task-remark-text { margin-top: 6px; color: #8993a4; font-size: 12px; font-style: italic; }
         
+        .btn-history { background-color: transparent; color: #6554c0; border: 1px solid #6554c0; padding: 6px 10px; font-size: 12px; margin-right: 5px; }
+        .btn-history:hover { background-color: #eae6ff; color: #6554c0; }
         .btn-delete { background-color: transparent; color: var(--adhoc); border: 1px solid var(--adhoc); padding: 6px 10px; font-size: 12px; }
         .btn-delete:hover { background-color: #ffebe6; color: var(--adhoc); }
         .btn-edit { background-color: transparent; color: var(--primary); border: 1px solid var(--primary); padding: 6px 10px; font-size: 12px; margin-right: 5px; }
@@ -201,6 +204,8 @@
         </div>
 
         <div class="flex-group align-items-center">
+            <!-- 新增：已完成 Ad-hoc Tasks 歸檔按鈕 -->
+            <button class="btn-settings btn-archive" onclick="openArchiveModal()">📦 已完成既 ad-hoc tasks</button>
             <div class="flex-center-gap">
                 <button class="btn-settings" onclick="openStaffSettings()">⚙️ 員工管理</button>
                 <button class="btn-settings btn-category" onclick="openCategorySettings()">🏷️ 分類管理</button>
@@ -221,7 +226,6 @@
             <input type="text" id="taskRemark" class="form-input-grow" placeholder="備註 (Optional)">
         </div>
         
-        <!-- 新增：子任務清單輸入框 -->
         <textarea id="taskSubtasks" class="textarea-subtasks" placeholder="子任務清單 (每行一個，例如：&#10;1. 對 Bank Statement&#10;2. 入 Journal)"></textarea>
         
         <div style="width: 100%; display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; align-items: center;">
@@ -267,11 +271,11 @@
                 <div id="routine-future-list" class="list-group" data-status="todo" data-type="Routine" style="min-height: 20px;"></div>
             </div>
             <div class="column">
-                <h2>🧐 1st Review (我睇)</h2>
+                <h2>🧐 1st Review</h2>
                 <div id="routine-review-am-list" class="list-group" data-status="review-am" data-type="Routine"></div>
             </div>
             <div class="column">
-                <h2>👔 Final Review (我腦細睇)</h2>
+                <h2>👔 Final Review</h2>
                 <div id="routine-review-boss-list" class="list-group" data-status="review-boss" data-type="Routine"></div>
             </div>
             <div class="column">
@@ -288,11 +292,11 @@
                 <div id="adhoc-todo-list" class="list-group" data-status="todo" data-type="Ad-hoc"></div>
             </div>
             <div class="column">
-                <h2>🧐 1st Review (我睇)</h2>
+                <h2>🧐 1st Review</h2>
                 <div id="adhoc-review-am-list" class="list-group" data-status="review-am" data-type="Ad-hoc"></div>
             </div>
             <div class="column">
-                <h2>👔 Final Review (我腦細睇)</h2>
+                <h2>👔 Final Review</h2>
                 <div id="adhoc-review-boss-list" class="list-group" data-status="review-boss" data-type="Ad-hoc"></div>
             </div>
             <div class="column">
@@ -302,6 +306,9 @@
         </div>
     </div>
 
+    <!-- ==========================================
+         🔍 Modals (對話框) 區域
+         ========================================== -->
     <div class="modal-overlay" id="calendarModal" style="padding: 20px; box-sizing: border-box;">
         <div class="modal-content modal-calendar-content">
             <div class="modal-calendar-header">
@@ -336,10 +343,10 @@
 
     <div class="modal-overlay" id="resetModal">
         <div class="modal-content" style="text-align: left;">
-            <h3 style="margin-top:0; color:var(--routine); text-align: center;">結算已完成嘅 Routine？</h3>
+            <h3 style="margin-top:0; color:var(--routine); text-align: center;">結算看板任務？</h3>
             <p style="font-size:13px; color:#5e6c84; line-height:1.5;">
-                系統只會將 <strong>「✅ Done」</strong> 內嘅 Routine 任務重新推入 To Do，並根據頻率自動延長 Deadline。<br><br>
-                超過30日先到期嘅任務會自動變成半透明沉底。
+                <strong>🔄 Routine：</strong> 自動推遲 Deadline 並重新推入 To Do。<br>
+                <strong>🔥 Ad-hoc：</strong> 自動移入「歸檔庫」，不再顯示於看板。
             </p>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeResetModal()">取消</button>
@@ -378,7 +385,6 @@
                 <label>負責人</label><select id="editTaskAssignee"></select>
                 <label>備註 (Remark)</label><input type="text" id="editTaskRemark">
                 
-                <!-- 新增：編輯子任務清單 -->
                 <label style="margin-top: 5px;">子任務清單 (每行一個)</label>
                 <textarea id="editTaskSubtasks" class="textarea-subtasks" style="margin-top: 0; margin-bottom: 5px;"></textarea>
                 
@@ -393,6 +399,30 @@
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeEditModal()">取消</button>
                 <button class="btn-confirm" id="confirmEditBtn" style="background-color: var(--primary);">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增：歸檔庫 Archive Modal -->
+    <div class="modal-overlay" id="archiveModal">
+        <div class="modal-content" style="width: 500px; max-width: 95%; max-height: 80vh; display: flex; flex-direction: column;">
+            <h3 style="margin-top:0; color:var(--adhoc);">📦 已完成既 ad-hoc tasks</h3>
+            <div id="archiveListContainer" style="overflow-y: auto; flex-grow: 1; text-align: left; padding-right: 5px;"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" style="width: 100%;" onclick="closeArchiveModal()">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增：歷史紀錄 History Modal -->
+    <div class="modal-overlay" id="historyModal" style="z-index: 10001;">
+        <div class="modal-content" style="width: 400px; max-width: 95%; text-align: left;">
+            <h3 style="margin-top:0; display:flex; align-items:center; gap:8px;">📜 任務歷史 <span style="font-size: 12px; font-weight:normal; color:#5e6c84;">(Audit Trail)</span></h3>
+            <h4 id="historyTaskName" style="color:var(--primary); margin-top:0; margin-bottom: 15px; border-bottom: 2px solid #dfe1e6; padding-bottom: 8px;"></h4>
+            <div id="historyTimeline" style="max-height: 350px; overflow-y: auto; background:#f4f5f7; padding:15px; border-radius:6px; font-size:13px; line-height: 1.6;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" style="width: 100%;" onclick="closeHistoryModal()">關閉</button>
             </div>
         </div>
     </div>
@@ -428,7 +458,6 @@
     <div class="modal-overlay" id="dbSettingsModal">
         <div class="modal-content" style="text-align: left;">
             <h3 style="margin-top:0; color:#172b4d; text-align: center;">💾 資料庫設定</h3>
-            
             <div class="db-settings-section db-settings-local">
                 <strong class="db-settings-title">1. 選擇儲存模式：</strong>
                 <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px; cursor: pointer;">
@@ -443,7 +472,6 @@
                     <input type="text" id="apiUrlInput" placeholder="貼上 https://script.google.com/..." style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 8px;">
                 </div>
             </div>
-
             <div class="db-settings-section db-settings-export">
                 <strong class="db-settings-title export">2. 本機備份 / 匯出：</strong>
                 <div style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -455,7 +483,6 @@
                     <button style="background-color: #de350b; padding: 8px 12px; font-size:12px;" onclick="importFromJSON()">📥 匯入</button>
                 </div>
             </div>
-
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeDbSettings()">取消</button>
                 <button class="btn-confirm" style="background-color: var(--primary);" onclick="saveStorageSettings()">儲存設定</button>
@@ -467,13 +494,16 @@
         // ==========================================
         // 🔧 全局設定與初始化 (Initialization)
         // ==========================================
-        const DEFAULT_CLOUD_URL = "https://script.google.com/macros/s/AKfycbz1q2Gi8YDzbnETQbZSXcdRUxyEJvND9RqAOO7uYcx3olLSfpIUX_z1dRPKf1qBy7X0Cg/exec"; 
+        const DEFAULT_CLOUD_URL = "https://script.google.com/macros/s/AKfycbzI-ipuwUzSMtV_Tj4BT_2m0JBLsTsE00IOgyWWPKIICpELwAL8C8ffj4ZH-68jyxHYeA/exec"; 
 
         let API_URL = ""; 
         let tasks = [];
         let staffList = [];
         let categoryList = [];
         let calendarApp = null;
+        
+        // 狀態名稱對照表 (供 History 使用)
+        const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review', 'review-boss': 'Final Review', 'done': 'Done', 'archived': '已歸檔' };
 
         window.onload = function() {
             try {
@@ -512,6 +542,17 @@
         // ==========================================
         function getLocalDateString(dateObj = new Date()) {
             return new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        }
+        
+        // 取得當前時間字串，例如 2026-08-11 14:30 (供 History 使用)
+        function getCurrentDateTime() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            return `${y}-${m}-${d} ${hh}:${mm}`;
         }
 
         function showToast(message) {
@@ -583,6 +624,7 @@
                 .then(data => {
                     let fetchedTasks = data.tasks || [];
                     tasks = fetchedTasks.map(t => {
+                        // 修正時區 Bug：將 UTC 轉換回 Local Time
                         if (t.deadline && t.deadline !== 'ASAP' && typeof t.deadline === 'string' && t.deadline.includes('T')) {
                             t.deadline = getLocalDateString(new Date(t.deadline));
                         }
@@ -641,7 +683,6 @@
             }
             document.getElementById('dbSettingsModal').style.display = 'flex'; 
         };
-        
         window.closeDbSettings = function() { document.getElementById('dbSettingsModal').style.display = 'none'; };
 
         window.toggleStorageInput = function() {
@@ -755,10 +796,7 @@
                 }
             }, 50);
         };
-
-        window.closeCalendarModal = function() {
-            document.getElementById('calendarModal').style.display = 'none';
-        };
+        window.closeCalendarModal = function() { document.getElementById('calendarModal').style.display = 'none'; };
 
         function renderCalendar() {
             const calendarEl = document.getElementById('calendar');
@@ -766,6 +804,7 @@
             const selectedCategory = document.getElementById('categoryFilter').value;
             
             const events = tasks.filter(t => {
+                if (t.status === 'archived') return false; // 隱藏已歸檔
                 if (selectedStaff !== "ALL" && t.assignee !== selectedStaff) return false;
                 if (selectedCategory !== "ALL" && t.category !== selectedCategory) return false;
                 if (t.deadline === 'ASAP') return false;
@@ -792,12 +831,8 @@
                     height: '100%',
                     headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
                     events: events,
-                    eventClick: function(info) { 
-                        openEditModal(info.event.id); 
-                    },
-                    dateClick: function(info) {
-                        openDayTasksModal(info.dateStr);
-                    }
+                    eventClick: function(info) { openEditModal(info.event.id); },
+                    dateClick: function(info) { openDayTasksModal(info.dateStr); }
                 });
                 calendarApp.render();
             } else {
@@ -810,7 +845,7 @@
         // 📑 特定日任務清單 Modal (Day Tasks View)
         // ==========================================
         window.openDayTasksModal = function(dateStr) {
-            const dayTasks = tasks.filter(t => t.deadline === dateStr);
+            const dayTasks = tasks.filter(t => t.deadline === dateStr && t.status !== 'archived');
             const container = document.getElementById('dayTasksContainer');
             document.getElementById('dayTasksTitle').innerText = `📅 任務清單 - ${dateStr}`;
 
@@ -821,8 +856,7 @@
                 dayTasks.forEach(task => {
                     let typeColor = task.type === 'Routine' ? 'var(--routine)' : 'var(--adhoc)';
                     let badgeClass = task.type === 'Routine' ? 'routine' : 'adhoc';
-                    let statusMap = { 'todo': 'To Do', 'review-am': '1st Review (我睇)', 'review-boss': 'Final Review (我腦細睇)', 'done': '✅ Done' };
-                    let statusText = statusMap[task.status] || task.status;
+                    let statusText = statusNameMap[task.status] || task.status;
                     let isDone = task.status === 'done';
                     
                     let titleClass = isDone ? 'day-task-title done' : 'day-task-title';
@@ -846,10 +880,7 @@
             }
             document.getElementById('dayTasksModal').style.display = 'flex';
         };
-
-        window.closeDayTasksModal = function() {
-            document.getElementById('dayTasksModal').style.display = 'none';
-        };
+        window.closeDayTasksModal = function() { document.getElementById('dayTasksModal').style.display = 'none'; };
 
         // ==========================================
         // 🖥️ 主要任務渲染引擎 (Render Tasks & Kanban)
@@ -883,6 +914,7 @@
             });
 
             tasks.forEach(task => {
+                if (task.status === 'archived') return; // 不顯示已歸檔任務
                 if (selectedStaff !== "ALL" && task.assignee !== selectedStaff) return;
                 if (selectedCategory !== "ALL" && task.category !== selectedCategory) return;
 
@@ -949,7 +981,6 @@
                     freqBadge = `<span class="badge freq">🔁 ${fMap[task.frequency]||'每月'}</span>`;
                 }
 
-                // 新增：生成子任務清單的 HTML
                 let subtasksHtml = '';
                 if (task.subtasks && task.subtasks.length > 0) {
                     const completedCount = task.subtasks.filter(st => st.done).length;
@@ -992,11 +1023,13 @@
                         <div class="card-actions">
                             <select onchange="updateStatus('${task.id}', this.value)">
                                 <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>To Do</option>
-                                <option value="review-am" ${task.status === 'review-am' ? 'selected' : ''}>1st Review (我睇)</option>
-                                <option value="review-boss" ${task.status === 'review-boss' ? 'selected' : ''}>Final Review (我腦細睇)</option>
+                                <option value="review-am" ${task.status === 'review-am' ? 'selected' : ''}>1st Review</option>
+                                <option value="review-boss" ${task.status === 'review-boss' ? 'selected' : ''}>Final Review</option>
                                 <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
                             </select>
                             <div style="display: flex; gap: 5px;">
+                                <!-- 新增：歷史按鈕 -->
+                                <button class="btn-history" onclick="openHistoryModal('${task.id}')">📜 歷史</button>
                                 <button class="btn-edit" onclick="openEditModal('${task.id}')">修改</button>
                                 <button class="btn-delete" onclick="openDeleteModal('${task.id}')">刪除</button>
                             </div>
@@ -1032,7 +1065,13 @@
                         const newStatus = evt.to.dataset.status;
                         const task = tasks.find(t => String(t.id) === String(taskId));
                         if (task && task.status !== newStatus) {
+                            const oldStatusName = statusNameMap[task.status] || task.status;
+                            const newStatusName = statusNameMap[newStatus] || newStatus;
+                            
                             task.status = newStatus;
+                            if (!task.history) task.history = [];
+                            task.history.push({ time: getCurrentDateTime(), log: `🔄 狀態: ${oldStatusName} ➔ ${newStatusName}` });
+                            
                             saveTasks(true);
                             renderTasks(); 
                         }
@@ -1051,7 +1090,6 @@
             const taskType = document.getElementById('taskType').value;
             const frequency = taskType === 'Routine' ? document.getElementById('taskFrequency').value : '';
             
-            // 處理子任務清單
             const subtasksText = document.getElementById('taskSubtasks').value;
             const parsedSubtasks = subtasksText.split('\n').filter(l => l.trim() !== '').map(text => ({ text: text.trim(), done: false }));
 
@@ -1065,14 +1103,16 @@
                 deadline: deadline,
                 remark: document.getElementById('taskRemark').value,
                 subtasks: parsedSubtasks,
-                status: 'todo' 
+                status: 'todo',
+                // 新增：寫入建立歷史
+                history: [{ time: getCurrentDateTime(), log: `➕ 建立任務` }]
             });
             
             saveTasks(true); renderTasks(); showToast('✅ 任務新增成功！');
             
             document.getElementById('taskName').value = '';
             document.getElementById('taskRemark').value = '';
-            document.getElementById('taskSubtasks').value = ''; // 清空子任務輸入框
+            document.getElementById('taskSubtasks').value = ''; 
             const asapCb = document.getElementById('taskIsASAP');
             asapCb.checked = false;
             window.toggleDeadline(asapCb, 'taskDeadline');
@@ -1080,10 +1120,18 @@
 
         window.updateStatus = function(id, newStatus) {
             const task = tasks.find(t => String(t.id) === String(id));
-            if (task) { task.status = newStatus; saveTasks(true); renderTasks(); }
+            if (task && task.status !== newStatus) {
+                const oldStatusName = statusNameMap[task.status] || task.status;
+                const newStatusName = statusNameMap[newStatus] || newStatus;
+                
+                task.status = newStatus;
+                if (!task.history) task.history = [];
+                task.history.push({ time: getCurrentDateTime(), log: `🔄 狀態: ${oldStatusName} ➔ ${newStatusName}` });
+                
+                saveTasks(true); renderTasks(); 
+            }
         };
 
-        // 新增：處理剔子任務嘅動作
         window.toggleSubtask = function(event, taskId, index) {
             const task = tasks.find(t => String(t.id) === String(taskId));
             if (task && task.subtasks && task.subtasks[index]) {
@@ -1114,13 +1162,17 @@
             }
         });
 
-        // --- 🔁 結算 Routine ---
+        // --- 🔁 結算 Routine / 歸檔 Ad-hoc ---
         window.openResetModal = function() { document.getElementById('resetModal').style.display = 'flex'; };
         window.closeResetModal = function() { document.getElementById('resetModal').style.display = 'none'; };
         
         document.getElementById('confirmResetBtn').addEventListener('click', function() {
             let resetCount = 0;
+            let archiveCount = 0;
+            
             tasks = tasks.map(task => {
+                if (!task.history) task.history = [];
+                
                 if (task.type === 'Routine' && task.status === 'done') {
                     task.status = 'todo';
                     if (task.deadline && task.deadline !== 'ASAP') {
@@ -1129,18 +1181,21 @@
                         date.setMonth(date.getMonth() + freq);
                         task.deadline = getLocalDateString(date);
                     }
-                    // 將所有子任務嘅剔號清空
-                    if(task.subtasks) {
-                        task.subtasks.forEach(st => st.done = false);
-                    }
+                    if(task.subtasks) task.subtasks.forEach(st => st.done = false);
+                    
+                    task.history.push({ time: getCurrentDateTime(), log: `🔁 結算 Routine: 狀態重置為 To Do，延期至 ${task.deadline}` });
                     resetCount++;
+                } else if (task.type === 'Ad-hoc' && task.status === 'done') {
+                    // 將刪除改為歸檔 (Archived)
+                    task.status = 'archived';
+                    task.history.push({ time: getCurrentDateTime(), log: `📦 結算 Ad-hoc: 移入歸檔庫` });
+                    archiveCount++;
                 }
                 return task;
             });
             
-            tasks = tasks.filter(task => !(task.type === 'Ad-hoc' && task.status === 'done'));
             saveTasks(true); renderTasks(); closeResetModal();
-            showToast(`✅ 結算完成！推遲咗 ${resetCount} 個 Routine 任務。`);
+            showToast(`✅ 結算完成！推遲 ${resetCount} 個 Routine，歸檔 ${archiveCount} 個 Ad-hoc。`);
         });
 
         // --- ✏️ 編輯任務 ---
@@ -1162,7 +1217,6 @@
             document.getElementById('editTaskAssignee').value = task.assignee;
             document.getElementById('editTaskRemark').value = task.remark || '';
             
-            // 讀取子任務清單入 Textarea
             document.getElementById('editTaskSubtasks').value = (task.subtasks || []).map(st => st.text).join('\n');
             
             const isASAP = task.deadline === 'ASAP';
@@ -1196,7 +1250,6 @@
                     task.assignee = document.getElementById('editTaskAssignee').value;
                     task.remark = document.getElementById('editTaskRemark').value;
                     
-                    // 更新子任務 (保留已有嘅打剔狀態)
                     const newSubtexts = document.getElementById('editTaskSubtasks').value.split('\n').filter(l => l.trim() !== '');
                     task.subtasks = newSubtexts.map(text => {
                         const existing = (task.subtasks || []).find(st => st.text === text.trim());
@@ -1206,11 +1259,88 @@
                     const isASAP = document.getElementById('editTaskIsASAP').checked;
                     task.deadline = isASAP ? 'ASAP' : document.getElementById('editTaskDeadline').value;
                     
+                    if (!task.history) task.history = [];
+                    task.history.push({ time: getCurrentDateTime(), log: `✏️ 編輯: 更新了任務內容/日期` });
+
                     saveTasks(true); renderTasks(); closeEditModal();
                     showToast('✏️ 修改成功！');
                 }
             }
         });
+
+        // ==========================================
+        // 📜 History & Archive (歷史與歸檔庫) 模組
+        // ==========================================
+        window.openHistoryModal = function(id) {
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (!task) return;
+            document.getElementById('historyTaskName').innerText = task.name;
+            const container = document.getElementById('historyTimeline');
+            
+            if (!task.history || task.history.length === 0) {
+                container.innerHTML = '<div style="color:#5e6c84; text-align:center; padding: 20px;">暫無歷史紀錄</div>';
+            } else {
+                let html = '';
+                task.history.forEach(h => {
+                    html += `<div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #dfe1e6;">
+                        <div style="color:#8993a4; font-size: 11px; margin-bottom: 4px;">🕒 ${h.time}</div>
+                        <div style="color:#172b4d;"><strong>${h.log}</strong></div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+                setTimeout(() => { container.scrollTop = container.scrollHeight; }, 10);
+            }
+            document.getElementById('historyModal').style.display = 'flex';
+        };
+        window.closeHistoryModal = function() { document.getElementById('historyModal').style.display = 'none'; };
+
+        window.openArchiveModal = function() {
+            renderArchiveList();
+            document.getElementById('archiveModal').style.display = 'flex';
+        };
+        window.closeArchiveModal = function() { document.getElementById('archiveModal').style.display = 'none'; };
+        
+        function renderArchiveList() {
+            const container = document.getElementById('archiveListContainer');
+            const archivedTasks = tasks.filter(t => t.status === 'archived').sort((a,b) => new Date(b.deadline) - new Date(a.deadline));
+            
+            if (archivedTasks.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#5e6c84; padding: 30px;">暫無已歸檔任務 🎉</p>';
+                return;
+            }
+            
+            let html = '<div style="display:flex; flex-direction:column; gap: 12px;">';
+            archivedTasks.forEach(t => {
+                html += `
+                    <div style="background:#f4f5f7; padding: 12px; border-radius:6px; border-left:4px solid var(--adhoc);">
+                        <div style="display:flex; justify-content:space-between; align-items: flex-start; gap:10px;">
+                            <strong style="color:#172b4d;">${escapeHTML(t.name)}</strong>
+                            <span style="font-size:12px; color:#5e6c84; white-space:nowrap;">👤 ${escapeHTML(t.assignee)}</span>
+                        </div>
+                        <div style="font-size:12px; margin-top:5px; color:#5e6c84;">📅 原定期限: ${t.deadline}</div>
+                        <div style="margin-top: 10px; display:flex; gap: 8px;">
+                            <button class="btn-history" style="padding: 4px 8px; font-size: 11px; margin: 0;" onclick="openHistoryModal('${t.id}')">📜 睇 History</button>
+                            <button class="btn-settings" style="padding: 4px 8px; font-size: 11px; background-color: var(--primary);" onclick="unarchiveTask('${t.id}')">↩️ 還原</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        window.unarchiveTask = function(id) {
+            const task = tasks.find(t => String(t.id) === String(id));
+            if (task) {
+                task.status = 'done';
+                if (!task.history) task.history = [];
+                task.history.push({ time: getCurrentDateTime(), log: `↩️ 由歸檔庫還原至 Done 狀態` });
+                saveTasks(true); 
+                renderTasks(); 
+                renderArchiveList(); // 即時更新歸檔庫畫面
+                showToast("✅ 任務已還原至看板");
+            }
+        };
 
         // ==========================================
         // 👤 員工管理模組 (Staff Settings)
