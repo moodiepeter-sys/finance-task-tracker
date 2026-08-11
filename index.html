@@ -271,11 +271,11 @@
                 <div id="routine-future-list" class="list-group" data-status="todo" data-type="Routine" style="min-height: 20px;"></div>
             </div>
             <div class="column">
-                <h2>🧐 1st Review</h2>
+                <h2>🧐 1st Review (我睇)</h2>
                 <div id="routine-review-am-list" class="list-group" data-status="review-am" data-type="Routine"></div>
             </div>
             <div class="column">
-                <h2>👔 Final Review</h2>
+                <h2>👔 Final Review (我腦細睇)</h2>
                 <div id="routine-review-boss-list" class="list-group" data-status="review-boss" data-type="Routine"></div>
             </div>
             <div class="column">
@@ -292,11 +292,11 @@
                 <div id="adhoc-todo-list" class="list-group" data-status="todo" data-type="Ad-hoc"></div>
             </div>
             <div class="column">
-                <h2>🧐 1st Review</h2>
+                <h2>🧐 1st Review (我睇)</h2>
                 <div id="adhoc-review-am-list" class="list-group" data-status="review-am" data-type="Ad-hoc"></div>
             </div>
             <div class="column">
-                <h2>👔 Final Review</h2>
+                <h2>👔 Final Review (我腦細睇)</h2>
                 <div id="adhoc-review-boss-list" class="list-group" data-status="review-boss" data-type="Ad-hoc"></div>
             </div>
             <div class="column">
@@ -503,7 +503,7 @@
         let calendarApp = null;
         
         // 狀態名稱對照表 (供 History 使用)
-        const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review', 'review-boss': 'Final Review', 'done': 'Done', 'archived': '已歸檔' };
+        const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review (我睇)', 'review-boss': 'Final Review (我腦細睇)', 'done': 'Done', 'archived': '已歸檔' };
 
         window.onload = function() {
             try {
@@ -1023,8 +1023,8 @@
                         <div class="card-actions">
                             <select onchange="updateStatus('${task.id}', this.value)">
                                 <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>To Do</option>
-                                <option value="review-am" ${task.status === 'review-am' ? 'selected' : ''}>1st Review</option>
-                                <option value="review-boss" ${task.status === 'review-boss' ? 'selected' : ''}>Final Review</option>
+                                <option value="review-am" ${task.status === 'review-am' ? 'selected' : ''}>1st Review (我睇)</option>
+                                <option value="review-boss" ${task.status === 'review-boss' ? 'selected' : ''}>Final Review (我腦細睇)</option>
                                 <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
                             </select>
                             <div style="display: flex; gap: 5px;">
