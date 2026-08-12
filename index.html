@@ -227,8 +227,19 @@
     </div>
 
     <div id="urgentPanel" class="urgent-panel" style="display: none;">
-        <h3>🚨 急件提醒 (ASAP / 7日內到期 / 過期)</h3>
-        <ul class="urgent-list" id="urgentList"></ul>
+        <h3 style="margin-bottom: 12px;">🚨 急件提醒</h3>
+        
+        <!-- 上層：ASAP / 突發極急件 -->
+        <div id="urgentAsapContainer" style="margin-bottom: 12px; display: none;">
+            <strong style="color: var(--adhoc); font-size: 14px;">⚡ ASAP / 突發極急件：</strong>
+            <ul class="urgent-list" id="urgentAsapList" style="margin-top: 5px;"></ul>
+        </div>
+        
+        <!-- 下層：Routine 常規到期/過期件 -->
+        <div id="urgentRoutineContainer" style="display: none;">
+            <strong style="color: var(--routine); font-size: 14px;">🔄 Routine 常規急件 (7日內/已過期)：</strong>
+            <ul class="urgent-list" id="urgentRoutineList" style="margin-top: 5px;"></ul>
+        </div>
     </div>
 
     <form class="form-container" id="taskForm">
@@ -947,11 +958,13 @@
                 renderCalendar(); 
             }
 
-            document.querySelectorAll('.list-group').forEach(el => el.innerHTML = '');
-            const urgentList = document.getElementById('urgentList');
-            urgentList.innerHTML = '';
+            const urgentAsapList = document.getElementById('urgentAsapList');
+            const urgentRoutineList = document.getElementById('urgentRoutineList');
+            urgentAsapList.innerHTML = '';
+            urgentRoutineList.innerHTML = '';
             
-            let urgentCount = 0;
+            let asapCount = 0;
+            let routineUrgentCount = 0;
             const todayObj = new Date();
             todayObj.setHours(0, 0, 0, 0);
             const todayMs = todayObj.getTime();
@@ -1023,14 +1036,22 @@
                         }
                     }
                     
-                    if (isUrgent) {
-                        urgentCount++;
-                        let sText = task.status === 'review-am' ? ' <strong class="urgent-review-am">(等你 Review)</strong>' : 
-                                    (task.status === 'review-boss' ? ' (等腦細批)' : ' (未完成)');
-                        let overdueDashboardText = isOverdue ? ' <strong class="urgent-overdue-badge">🔴 已過期</strong>' : '';
-
-                        urgentList.innerHTML += `<li><strong>${displayDate}</strong> - ${escapeHTML(task.name)} [負責人: ${escapeHTML(task.assignee)}] ${sText}${overdueDashboardText}</li>`;
+                if (isUrgent) {
+                    let sText = task.status === 'review-am' ? ' <strong class="urgent-review-am">(等你 Review)</strong>' : 
+                                (task.status === 'review-boss' ? ' (等腦細批)' : ' (未完成)');
+                    let overdueDashboardText = isOverdue ? ' <strong class="urgent-overdue-badge">🔴 已過期</strong>' : '';
+                
+                    const itemHtml = `<li><strong>${displayDate}</strong> - ${escapeHTML(task.name)} [負責人: ${escapeHTML(task.assignee)}] ${sText}${overdueDashboardText}</li>`;
+                
+                    // 判斷放上層 (ASAP/Ad-hoc) 定下層 (Routine)
+                    if (task.deadline === 'ASAP' || task.type === 'Ad-hoc') {
+                        asapCount++;
+                        urgentAsapList.innerHTML += itemHtml;
+                    } else {
+                        routineUrgentCount++;
+                        urgentRoutineList.innerHTML += itemHtml;
                     }
+                }
                 }
                 
                 const remarkHtml = task.remark ? `<div class="task-remark-text">📝 備註: ${escapeHTML(task.remark)}</div>` : '';
@@ -1108,7 +1129,10 @@
             });
             
             if(futureDivider) futureDivider.style.display = hasFutureTasks ? 'flex' : 'none';
-            document.getElementById('urgentPanel').style.display = urgentCount > 0 ? 'block' : 'none';
+            // 分別控制上下層顯示，如果完全冇急件先隱藏整個 Panel
+            document.getElementById('urgentAsapContainer').style.display = asapCount > 0 ? 'block' : 'none';
+            document.getElementById('urgentRoutineContainer').style.display = routineUrgentCount > 0 ? 'block' : 'none';
+            document.getElementById('urgentPanel').style.display = (asapCount + routineUrgentCount) > 0 ? 'block' : 'none';
         }
 
         // ==========================================
