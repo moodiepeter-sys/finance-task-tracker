@@ -31,7 +31,7 @@
         .header-container { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 30px; position: relative; }
         h1 { color: #172b4d; margin: 0; }
         
-        .top-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .top-controls { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
         .flex-group { display: flex; gap: 10px; flex-wrap: wrap; }
         .flex-center-gap { display: flex; align-items: center; gap: 8px; }
         
@@ -39,14 +39,21 @@
         .form-input-grow { flex-grow: 1; }
 
         /* ==========================================
-           🎛️ 3. UI 元件 (Buttons, Inputs, Badges, Toasts)
+           🎛️ 3. UI 元件 (Buttons, Inputs, Badges, Toasts, Filter Tags)
            ========================================== */
         input, select, button, textarea { padding: 10px; border: 1px solid #dfe1e6; border-radius: 4px; font-size: 14px; font-family: inherit; }
         button { background-color: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         button:hover { background-color: #0047b3; }
         
-        .filter-container { background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 10px; border-left: 4px solid var(--primary); }
-        .filter-container select { padding: 6px; border-radius: 4px; border: 1px solid #dfe1e6; font-weight: bold; color: var(--primary); }
+        .filter-section { background: white; padding: 12px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 8px; border-left: 4px solid var(--primary); min-width: 300px; flex-grow: 1; }
+        .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .filter-label { font-size: 13px; font-weight: bold; color: #172b4d; min-width: 55px; }
+        .tag-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        
+        .filter-tag { padding: 4px 10px; border-radius: 16px; font-size: 12px; font-weight: bold; cursor: pointer; background-color: #ebecf0; color: #5e6c84; border: 1px solid #dfe1e6; transition: all 0.2s ease; user-select: none; }
+        .filter-tag:hover { background-color: #dfe1e6; color: #172b4d; }
+        .filter-tag.active-staff { background-color: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 1px 3px rgba(0,82,204,0.3); }
+        .filter-tag.active-category { background-color: #6554c0; color: white; border-color: #6554c0; box-shadow: 0 1px 3px rgba(101,84,192,0.3); }
         
         #cloudStatus { background: #e3fcef; color: #006644; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #00a670; display: inline-block; }
         
@@ -200,18 +207,15 @@
     <div id="toast">✅ 操作成功</div>
 
     <div class="top-controls">
-        <div class="flex-group">
-            <div class="filter-container">
-                <span>🔍 同事:</span>
-                <select id="staffFilter" onchange="renderTasks()">
-                    <option value="ALL">🌟 全部 (All Team)</option>
-                </select>
+        <!-- 多選標籤過濾器 (Multi-Select Tag Filters) -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <span class="filter-label">🔍 同事:</span>
+                <div class="tag-group" id="staffTagGroup"></div>
             </div>
-            <div class="filter-container">
-                <span>📂 分類:</span>
-                <select id="categoryFilter" onchange="renderTasks()">
-                    <option value="ALL">🌟 全部分類</option>
-                </select>
+            <div class="filter-row">
+                <span class="filter-label">📂 分類:</span>
+                <div class="tag-group" id="categoryTagGroup"></div>
             </div>
         </div>
 
@@ -523,6 +527,10 @@
         let categoryList = [];
         let calendarApp = null;
         let isSyncing = false; // 防重複發送請求狀態鎖
+        
+        // 多選過濾器狀態陣列 (選取項目清單)
+        let selectedStaffs = ['ALL'];
+        let selectedCategories = ['ALL'];
         
         // 狀態名稱對照表 (供 History 使用)
         const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review (我睇)', 'review-boss': 'Final Review (我腦細睇)', 'done': 'Done', 'archived': '已歸檔' };
@@ -869,13 +877,14 @@
 
         function renderCalendar() {
             const calendarEl = document.getElementById('calendar');
-            const selectedStaff = document.getElementById('staffFilter').value;
-            const selectedCategory = document.getElementById('categoryFilter').value;
             
             const events = tasks.filter(t => {
                 if (t.status === 'archived') return false; // 隱藏已歸檔
-                if (selectedStaff !== "ALL" && t.assignee !== selectedStaff) return false;
-                if (selectedCategory !== "ALL" && t.category !== selectedCategory) return false;
+                
+                // 多選篩選 (Multi-Select Filter Check)
+                if (!selectedStaffs.includes("ALL") && !selectedStaffs.includes(t.assignee)) return false;
+                if (!selectedCategories.includes("ALL") && !selectedCategories.includes(t.category)) return false;
+                
                 if (!t.deadline || t.deadline === 'ASAP' || isNaN(Date.parse(t.deadline))) return false; // 安全過濾無效或空日期
                 return true;
             }).map(t => {
@@ -972,9 +981,6 @@
             const todayObj = new Date();
             todayObj.setHours(0, 0, 0, 0);
             const todayMs = todayObj.getTime();
-            
-            const selectedStaff = document.getElementById('staffFilter').value;
-            const selectedCategory = document.getElementById('categoryFilter').value;
 
             const futureDivider = document.getElementById('routine-future-divider');
             if(futureDivider) futureDivider.style.display = 'none';
@@ -992,8 +998,10 @@
 
             tasks.forEach(task => {
                 if (task.status === 'archived') return; // 不顯示已歸檔任務
-                if (selectedStaff !== "ALL" && task.assignee !== selectedStaff) return;
-                if (selectedCategory !== "ALL" && task.category !== selectedCategory) return;
+                
+                // 多選過濾器判斷 (Staff & Category Multi-select logic)
+                if (!selectedStaffs.includes("ALL") && !selectedStaffs.includes(task.assignee)) return;
+                if (!selectedCategories.includes("ALL") && !selectedCategories.includes(task.category)) return;
 
                 const typeClass = task.type === 'Routine' ? 'routine' : 'adhoc';
                 const boardPrefix = task.type === 'Routine' ? 'routine' : 'adhoc';
@@ -1428,23 +1436,51 @@
         };
 
         // ==========================================
-        // 👤 員工管理模組 (Staff Settings)
+        // 👤 員工管理與多選過濾 (Staff Settings & Tag Filters)
         // ==========================================
+        function toggleStaffFilter(staff) {
+            if (staff === 'ALL') {
+                selectedStaffs = ['ALL'];
+            } else {
+                selectedStaffs = selectedStaffs.filter(s => s !== 'ALL');
+                const idx = selectedStaffs.indexOf(staff);
+                if (idx > -1) {
+                    selectedStaffs.splice(idx, 1);
+                } else {
+                    selectedStaffs.push(staff);
+                }
+                if (selectedStaffs.length === 0) {
+                    selectedStaffs = ['ALL'];
+                }
+            }
+            renderStaffOptions();
+            renderTasks();
+        }
+
         function renderStaffOptions() {
             const addSelect = document.getElementById('taskAssignee');
             const editSelect = document.getElementById('editTaskAssignee');
-            const filterSelect = document.getElementById('staffFilter');
-            const currentFilter = filterSelect.value;
-            
             addSelect.innerHTML = ''; editSelect.innerHTML = '';
-            filterSelect.innerHTML = '<option value="ALL">🌟 全部 (All Team)</option>';
             
             staffList.forEach(staff => {
-                addSelect.innerHTML += `<option value="${staff}">${staff}</option>`;
-                editSelect.innerHTML += `<option value="${staff}">${staff}</option>`;
-                filterSelect.innerHTML += `<option value="${staff}">👤 ${staff}</option>`;
+                addSelect.innerHTML += `<option value="${escapeHTML(staff)}">${escapeHTML(staff)}</option>`;
+                editSelect.innerHTML += `<option value="${escapeHTML(staff)}">${escapeHTML(staff)}</option>`;
             });
-            filterSelect.value = currentFilter || "ALL";
+
+            // 清除已刪除員工的篩選紀錄
+            selectedStaffs = selectedStaffs.filter(s => s === 'ALL' || staffList.includes(s));
+            if (selectedStaffs.length === 0) selectedStaffs = ['ALL'];
+
+            // 渲染多選 Tag 按鈕 UI
+            const tagGroup = document.getElementById('staffTagGroup');
+            if (tagGroup) {
+                let html = `<span class="filter-tag ${selectedStaffs.includes('ALL') ? 'active-staff' : ''}" onclick="toggleStaffFilter('ALL')">🌟 全部</span>`;
+                staffList.forEach(staff => {
+                    const isActive = selectedStaffs.includes(staff);
+                    html += `<span class="filter-tag ${isActive ? 'active-staff' : ''}" onclick="toggleStaffFilter('${escapeHTML(staff)}')">👤 ${escapeHTML(staff)}</span>`;
+                });
+                tagGroup.innerHTML = html;
+            }
         }
 
         window.openStaffSettings = function() { renderStaffSettingsList(); document.getElementById('staffSettingsModal').style.display = 'flex'; };
@@ -1454,7 +1490,7 @@
             const container = document.getElementById('staffListContainer');
             container.innerHTML = '';
             staffList.forEach((staff, index) => {
-                container.innerHTML += `<div class="staff-list-item"><span>👤 <strong>${staff}</strong></span><button onclick="removeStaff(${index})">移除</button></div>`;
+                container.innerHTML += `<div class="staff-list-item"><span>👤 <strong>${escapeHTML(staff)}</strong></span><button onclick="removeStaff(${index})">移除</button></div>`;
             });
         }
 
@@ -1475,23 +1511,51 @@
         };
 
         // ==========================================
-        // 🏷️ 分類管理模組 (Category Settings)
+        // 🏷️ 分類管理與多選過濾 (Category Settings & Tag Filters)
         // ==========================================
+        function toggleCategoryFilter(cat) {
+            if (cat === 'ALL') {
+                selectedCategories = ['ALL'];
+            } else {
+                selectedCategories = selectedCategories.filter(c => c !== 'ALL');
+                const idx = selectedCategories.indexOf(cat);
+                if (idx > -1) {
+                    selectedCategories.splice(idx, 1);
+                } else {
+                    selectedCategories.push(cat);
+                }
+                if (selectedCategories.length === 0) {
+                    selectedCategories = ['ALL'];
+                }
+            }
+            renderCategoryOptions();
+            renderTasks();
+        }
+
         function renderCategoryOptions() {
             const addSelect = document.getElementById('taskCategory');
             const editSelect = document.getElementById('editTaskCategory');
-            const filterSelect = document.getElementById('categoryFilter');
-            const currentFilter = filterSelect.value;
-            
             addSelect.innerHTML = ''; editSelect.innerHTML = '';
-            filterSelect.innerHTML = '<option value="ALL">🌟 全部分類</option>';
             
             categoryList.forEach(cat => {
                 addSelect.innerHTML += `<option value="${escapeHTML(cat)}">${escapeHTML(cat)}</option>`;
                 editSelect.innerHTML += `<option value="${escapeHTML(cat)}">${escapeHTML(cat)}</option>`;
-                filterSelect.innerHTML += `<option value="${escapeHTML(cat)}">📂 ${escapeHTML(cat)}</option>`;
             });
-            filterSelect.value = currentFilter || "ALL";
+
+            // 清除已刪除分類的篩選紀錄
+            selectedCategories = selectedCategories.filter(c => c === 'ALL' || categoryList.includes(c));
+            if (selectedCategories.length === 0) selectedCategories = ['ALL'];
+
+            // 渲染多選 Tag 按鈕 UI
+            const tagGroup = document.getElementById('categoryTagGroup');
+            if (tagGroup) {
+                let html = `<span class="filter-tag ${selectedCategories.includes('ALL') ? 'active-category' : ''}" onclick="toggleCategoryFilter('ALL')">🌟 全部</span>`;
+                categoryList.forEach(cat => {
+                    const isActive = selectedCategories.includes(cat);
+                    html += `<span class="filter-tag ${isActive ? 'active-category' : ''}" onclick="toggleCategoryFilter('${escapeHTML(cat)}')">📂 ${escapeHTML(cat)}</span>`;
+                });
+                tagGroup.innerHTML = html;
+            }
         }
 
         window.openCategorySettings = function() { renderCategorySettingsList(); document.getElementById('categorySettingsModal').style.display = 'flex'; };
