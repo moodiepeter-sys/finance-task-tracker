@@ -317,6 +317,8 @@
             <div class="column">
                 <h2>📝 To Do</h2>
                 <div id="adhoc-todo-list" class="list-group" data-status="todo" data-type="Ad-hoc"></div>
+                <div id="adhoc-future-divider" class="future-divider" style="display:none;">🔭 遠期任務 (>30日)</div>
+                <div id="adhoc-future-list" class="list-group" data-status="todo" data-type="Ad-hoc" style="min-height: 20px;"></div>
             </div>
             <div class="column">
                 <h2>🧐 1st Review (我睇)</h2>
@@ -982,9 +984,13 @@
             todayObj.setHours(0, 0, 0, 0);
             const todayMs = todayObj.getTime();
 
-            const futureDivider = document.getElementById('routine-future-divider');
-            if(futureDivider) futureDivider.style.display = 'none';
-            let hasFutureTasks = false;
+            const routineFutureDivider = document.getElementById('routine-future-divider');
+            const adhocFutureDivider = document.getElementById('adhoc-future-divider');
+            if(routineFutureDivider) routineFutureDivider.style.display = hasRoutineFuture ? 'flex' : 'none';
+            if(adhocFutureDivider) adhocFutureDivider.style.display = hasAdhocFuture ? 'flex' : 'none';
+            
+            let hasRoutineFuture = false;
+            let hasAdhocFuture = false;
 
             tasks.sort((a, b) => {
                 if (a.deadline === 'ASAP' && b.deadline !== 'ASAP') return -1;
@@ -1130,7 +1136,13 @@
                 `;
                 
                 let targetListId = `${boardPrefix}-${task.status}-list`;
-                if (task.type === 'Routine' && task.status === 'todo' && isFuture) {
+                let targetListId = `${boardPrefix}-${task.status}-list`;
+                if (task.status === 'todo' && isFuture) {
+                    targetListId = `${boardPrefix}-future-list`;
+                    card.classList.add('future-task');
+                    if (task.type === 'Routine') hasRoutineFuture = true;
+                    if (task.type === 'Ad-hoc') hasAdhocFuture = true;
+                } {
                     targetListId = `routine-future-list`;
                     card.classList.add('future-task');
                     hasFutureTasks = true;
