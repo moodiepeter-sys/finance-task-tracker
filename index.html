@@ -986,8 +986,8 @@
 
             const routineFutureDivider = document.getElementById('routine-future-divider');
             const adhocFutureDivider = document.getElementById('adhoc-future-divider');
-            if(routineFutureDivider) routineFutureDivider.style.display = hasRoutineFuture ? 'flex' : 'none';
-            if(adhocFutureDivider) adhocFutureDivider.style.display = hasAdhocFuture ? 'flex' : 'none';
+            if(routineFutureDivider) routineFutureDivider.style.display = 'none';
+            if(adhocFutureDivider) adhocFutureDivider.style.display = 'none';
             
             let hasRoutineFuture = false;
             let hasAdhocFuture = false;
@@ -1136,23 +1136,20 @@
                 `;
                 
                 let targetListId = `${boardPrefix}-${task.status}-list`;
-                let targetListId = `${boardPrefix}-${task.status}-list`;
                 if (task.status === 'todo' && isFuture) {
                     targetListId = `${boardPrefix}-future-list`;
                     card.classList.add('future-task');
                     if (task.type === 'Routine') hasRoutineFuture = true;
                     if (task.type === 'Ad-hoc') hasAdhocFuture = true;
-                } {
-                    targetListId = `routine-future-list`;
-                    card.classList.add('future-task');
-                    hasFutureTasks = true;
                 }
 
                 const targetList = document.getElementById(targetListId);
                 if (targetList) targetList.appendChild(card);
             });
             
-            if(futureDivider) futureDivider.style.display = hasFutureTasks ? 'flex' : 'none';
+            // 判斷並顯示/隱藏遠期任務的分隔線
+            if(routineFutureDivider) routineFutureDivider.style.display = hasRoutineFuture ? 'flex' : 'none';
+            if(adhocFutureDivider) adhocFutureDivider.style.display = hasAdhocFuture ? 'flex' : 'none';
             
             // 分別控制急件面板上下層顯示
             document.getElementById('urgentAsapContainer').style.display = asapCount > 0 ? 'block' : 'none';
