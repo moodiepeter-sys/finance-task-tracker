@@ -122,7 +122,10 @@
 
         .future-task { opacity: 0.55; background-color: #fafbfc; border-left-color: #a5adba !important; transform: scale(0.98); }
         .future-task:hover { opacity: 0.9; transform: scale(1); }
-        .future-divider { font-size: 12px; color: #5e6c84; text-align: center; margin: 15px 0 5px 0; display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        
+        /* 遠期任務可點擊分隔線樣式 */
+        .future-divider { font-size: 12px; color: #5e6c84; text-align: center; margin: 15px 0 5px 0; display: flex; align-items: center; gap: 8px; font-weight: bold; cursor: pointer; user-select: none; transition: color 0.2s; }
+        .future-divider:hover { color: var(--primary); }
         .future-divider::before, .future-divider::after { content: ""; flex: 1; border-bottom: 1px dashed #c1c7d0; }
         .sortable-ghost { opacity: 0.4; background-color: #dfe1e6; }
         
@@ -294,8 +297,9 @@
             <div class="column">
                 <h2>📝 To Do</h2>
                 <div id="routine-todo-list" class="list-group" data-status="todo" data-type="Routine"></div>
-                <div id="routine-future-divider" class="future-divider" style="display:none;">🔭 遠期任務 (>30日)</div>
-                <div id="routine-future-list" class="list-group" data-status="todo" data-type="Routine" style="min-height: 20px;"></div>
+                <!-- 遠期任務折疊分隔線 (點擊可展開/收起) -->
+                <div id="routine-future-divider" class="future-divider" style="display:none;" onclick="toggleFutureList('routine')"></div>
+                <div id="routine-future-list" class="list-group" data-status="todo" data-type="Routine" style="min-height: 20px; display: none;"></div>
             </div>
             <div class="column">
                 <h2>🧐 1st Review (我睇)</h2>
@@ -317,8 +321,9 @@
             <div class="column">
                 <h2>📝 To Do</h2>
                 <div id="adhoc-todo-list" class="list-group" data-status="todo" data-type="Ad-hoc"></div>
-                <div id="adhoc-future-divider" class="future-divider" style="display:none;">🔭 遠期任務 (>30日)</div>
-                <div id="adhoc-future-list" class="list-group" data-status="todo" data-type="Ad-hoc" style="min-height: 20px;"></div>
+                <!-- 遠期任務折疊分隔線 (點擊可展開/收起) -->
+                <div id="adhoc-future-divider" class="future-divider" style="display:none;" onclick="toggleFutureList('adhoc')"></div>
+                <div id="adhoc-future-list" class="list-group" data-status="todo" data-type="Ad-hoc" style="min-height: 20px; display: none;"></div>
             </div>
             <div class="column">
                 <h2>🧐 1st Review (我睇)</h2>
@@ -534,6 +539,9 @@
         let selectedStaffs = ['ALL'];
         let selectedCategories = ['ALL'];
         
+        // 遠期任務折疊狀態紀錄器 (預設不展開)
+        let futureExpandedState = { routine: false, adhoc: false };
+        
         // 狀態名稱對照表 (供 History 使用)
         const statusNameMap = { 'todo': 'To Do', 'review-am': '1st Review (我睇)', 'review-boss': 'Final Review (我腦細睇)', 'done': 'Done', 'archived': '已歸檔' };
 
@@ -623,6 +631,12 @@
                 input.value = getLocalDateString();
             }
         };
+
+        // 折疊/展開遠期任務列表
+        function toggleFutureList(type) {
+            futureExpandedState[type] = !futureExpandedState[type];
+            renderTasks();
+        }
 
         // ==========================================
         // ☁️ 資料庫與雲端通訊 (Storage & API)
@@ -980,17 +994,12 @@
             
             let asapCount = 0;
             let routineUrgentCount = 0;
+            let routineFutureCount = 0;
+            let adhocFutureCount = 0;
+
             const todayObj = new Date();
             todayObj.setHours(0, 0, 0, 0);
             const todayMs = todayObj.getTime();
-
-            const routineFutureDivider = document.getElementById('routine-future-divider');
-            const adhocFutureDivider = document.getElementById('adhoc-future-divider');
-            if(routineFutureDivider) routineFutureDivider.style.display = 'none';
-            if(adhocFutureDivider) adhocFutureDivider.style.display = 'none';
-            
-            let hasRoutineFuture = false;
-            let hasAdhocFuture = false;
 
             tasks.sort((a, b) => {
                 if (a.deadline === 'ASAP' && b.deadline !== 'ASAP') return -1;
@@ -1139,17 +1148,33 @@
                 if (task.status === 'todo' && isFuture) {
                     targetListId = `${boardPrefix}-future-list`;
                     card.classList.add('future-task');
-                    if (task.type === 'Routine') hasRoutineFuture = true;
-                    if (task.type === 'Ad-hoc') hasAdhocFuture = true;
+                    if (task.type === 'Routine') routineFutureCount++;
+                    if (task.type === 'Ad-hoc') adhocFutureCount++;
                 }
 
                 const targetList = document.getElementById(targetListId);
                 if (targetList) targetList.appendChild(card);
             });
             
-            // 判斷並顯示/隱藏遠期任務的分隔線
-            if(routineFutureDivider) routineFutureDivider.style.display = hasRoutineFuture ? 'flex' : 'none';
-            if(adhocFutureDivider) adhocFutureDivider.style.display = hasAdhocFuture ? 'flex' : 'none';
+            // 更新並顯示/隱藏 Routine 遠期任務折疊分隔線
+            const routineDivider = document.getElementById('routine-future-divider');
+            const routineList = document.getElementById('routine-future-list');
+            if (routineDivider && routineList) {
+                routineDivider.style.display = routineFutureCount > 0 ? 'flex' : 'none';
+                const isExpanded = futureExpandedState.routine;
+                routineDivider.innerHTML = `${isExpanded ? '🔽' : '▶'} 🔭 遠期任務 (>30日) (${routineFutureCount})`;
+                routineList.style.display = isExpanded ? 'flex' : 'none';
+            }
+
+            // 更新並顯示/隱藏 Ad-hoc 遠期任務折疊分隔線
+            const adhocDivider = document.getElementById('adhoc-future-divider');
+            const adhocList = document.getElementById('adhoc-future-list');
+            if (adhocDivider && adhocList) {
+                adhocDivider.style.display = adhocFutureCount > 0 ? 'flex' : 'none';
+                const isExpanded = futureExpandedState.adhoc;
+                adhocDivider.innerHTML = `${isExpanded ? '🔽' : '▶'} 🔭 遠期任務 (>30日) (${adhocFutureCount})`;
+                adhocList.style.display = isExpanded ? 'flex' : 'none';
+            }
             
             // 分別控制急件面板上下層顯示
             document.getElementById('urgentAsapContainer').style.display = asapCount > 0 ? 'block' : 'none';
